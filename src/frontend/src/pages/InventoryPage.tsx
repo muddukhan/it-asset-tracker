@@ -260,22 +260,16 @@ export function InventoryPage({
                 {filtered.length} asset{filtered.length !== 1 ? "s" : ""} found
               </p>
             </div>
-            {isAdmin && (
-              <Button
-                onClick={() => {
-                  setEditAsset(null);
-                  setAddModalOpen(true);
-                }}
-                style={{
-                  backgroundColor: "oklch(var(--primary))",
-                  color: "white",
-                }}
-                data-ocid="inventory.open_modal_button"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add Asset
-              </Button>
-            )}
+            <Button
+              onClick={() => {
+                setEditAsset(null);
+                setAddModalOpen(true);
+              }}
+              data-ocid="inventory.open_modal_button"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Asset
+            </Button>
           </div>
 
           {assetsLoading ? (
@@ -293,18 +287,16 @@ export function InventoryPage({
               <p className="text-sm font-medium text-muted-foreground">
                 No assets found
               </p>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditAsset(null);
-                    setAddModalOpen(true);
-                  }}
-                >
-                  Add your first asset
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditAsset(null);
+                  setAddModalOpen(true);
+                }}
+              >
+                Add your first asset
+              </Button>
             </div>
           ) : (
             <>
@@ -492,6 +484,7 @@ export function InventoryPage({
             setEditAsset(null);
           }}
           asset={editAsset}
+          isAdmin={!!isAdmin}
         />
         <AssetDetailModal
           asset={detailAsset}

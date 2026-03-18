@@ -27,6 +27,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   asset?: Asset | null;
+  isAdmin?: boolean;
 };
 
 type FormState = {
@@ -53,7 +54,7 @@ const defaultForm: FormState = {
   notes: "",
 };
 
-export function AssetModal({ open, onClose, asset }: Props) {
+export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -112,6 +113,12 @@ export function AssetModal({ open, onClose, asset }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      toast.error(
+        "Admin access required to add assets. Go to the Admin panel and click Make Me Admin first.",
+      );
+      return;
+    }
     let photoId: ExternalBlob | undefined = undefined;
     if (photoFile) {
       const bytes = new Uint8Array(await photoFile.arrayBuffer());
@@ -159,6 +166,16 @@ export function AssetModal({ open, onClose, asset }: Props) {
         <DialogHeader>
           <DialogTitle>{asset ? "Edit Asset" : "Add New Asset"}</DialogTitle>
         </DialogHeader>
+        {!isAdmin && (
+          <div
+            className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-700 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300"
+            data-ocid="asset.error_state"
+          >
+            <strong>Admin access required.</strong> Go to the Admin panel and
+            click <strong>Make Me Admin</strong> to enable adding or editing
+            assets.
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           {/* Photo upload */}
           <div className="space-y-2">
