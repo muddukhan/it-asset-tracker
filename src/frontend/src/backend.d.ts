@@ -14,7 +14,17 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
+export interface WarrantyStats {
+    expiringSoon: bigint;
+    total: bigint;
+    active: bigint;
+    expired: bigint;
+}
 export type Time = bigint;
+export interface UserWithRole {
+    principal: Principal;
+    role: UserRole;
+}
 export interface Stats {
     assigned: bigint;
     total: bigint;
@@ -87,8 +97,10 @@ export enum UserRole {
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
+    getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
     getAssetsByCategory(category: AssetCategory): Promise<Array<Asset>>;
     getAssetsByLocation(location: string): Promise<Array<Asset>>;
@@ -99,6 +111,7 @@ export interface backendInterface {
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
     getStats(): Promise<Stats>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getWarrantyStats(): Promise<WarrantyStats>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;

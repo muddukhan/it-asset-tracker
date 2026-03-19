@@ -6,6 +6,7 @@ import type {
   AssetInput,
   AssetStatus,
   UserRole,
+  UserWithRole,
 } from "../backend";
 import { useActor } from "./useActor";
 
@@ -114,7 +115,36 @@ export function useAssignUserRole() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["isAdmin"] });
+      queryClient.invalidateQueries({ queryKey: ["usersWithRoles"] });
     },
+  });
+}
+
+export function useBootstrapAdmin() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<boolean> => {
+      if (!actor) throw new Error("Not connected");
+      return actor.bootstrapAdmin();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["isAdmin"] });
+      queryClient.invalidateQueries({ queryKey: ["callerRole"] });
+      queryClient.invalidateQueries({ queryKey: ["usersWithRoles"] });
+    },
+  });
+}
+
+export function useGetAllUsersWithRoles(isAdmin: boolean) {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserWithRole[]>({
+    queryKey: ["usersWithRoles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllUsersWithRoles();
+    },
+    enabled: !!actor && !isFetching && isAdmin,
   });
 }
 

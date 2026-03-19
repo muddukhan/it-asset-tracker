@@ -69,8 +69,12 @@ export const Asset = IDL.Record({
   'location' : IDL.Text,
   'photoId' : IDL.Opt(ExternalBlob),
 });
-export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const Principal = IDL.Principal;
+export const UserWithRole = IDL.Record({
+  'principal' : Principal,
+  'role' : UserRole,
+});
+export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const AssignmentHistoryEntry = IDL.Record({
   'id' : IDL.Nat,
   'changedBy' : Principal,
@@ -87,6 +91,12 @@ export const Stats = IDL.Record({
   'total' : IDL.Nat,
   'available' : IDL.Nat,
   'inRepair' : IDL.Nat,
+});
+export const WarrantyStats = IDL.Record({
+  'expiringSoon' : IDL.Nat,
+  'total' : IDL.Nat,
+  'active' : IDL.Nat,
+  'expired' : IDL.Nat,
 });
 
 export const idlService = IDL.Service({
@@ -119,8 +129,10 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
   'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
+  'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
   'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
   'getAssetsByCategory' : IDL.Func(
       [AssetCategory],
@@ -139,6 +151,7 @@ export const idlService = IDL.Service({
     ),
   'getStats' : IDL.Func([], [Stats], ['query']),
   'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
+  'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
@@ -209,8 +222,12 @@ export const idlFactory = ({ IDL }) => {
     'location' : IDL.Text,
     'photoId' : IDL.Opt(ExternalBlob),
   });
-  const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const Principal = IDL.Principal;
+  const UserWithRole = IDL.Record({
+    'principal' : Principal,
+    'role' : UserRole,
+  });
+  const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const AssignmentHistoryEntry = IDL.Record({
     'id' : IDL.Nat,
     'changedBy' : Principal,
@@ -227,6 +244,12 @@ export const idlFactory = ({ IDL }) => {
     'total' : IDL.Nat,
     'available' : IDL.Nat,
     'inRepair' : IDL.Nat,
+  });
+  const WarrantyStats = IDL.Record({
+    'expiringSoon' : IDL.Nat,
+    'total' : IDL.Nat,
+    'active' : IDL.Nat,
+    'expired' : IDL.Nat,
   });
   
   return IDL.Service({
@@ -259,8 +282,10 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
     'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
+    'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
     'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
     'getAssetsByCategory' : IDL.Func(
         [AssetCategory],
@@ -279,6 +304,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getStats' : IDL.Func([], [Stats], ['query']),
     'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
+    'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),

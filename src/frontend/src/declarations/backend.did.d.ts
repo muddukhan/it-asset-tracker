@@ -73,6 +73,13 @@ export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface UserWithRole { 'principal' : Principal, 'role' : UserRole }
+export interface WarrantyStats {
+  'expiringSoon' : bigint,
+  'total' : bigint,
+  'active' : bigint,
+  'expired' : bigint,
+}
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -103,8 +110,10 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'bootstrapAdmin' : ActorMethod<[], boolean>,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
   'getAllAssets' : ActorMethod<[], Array<Asset>>,
+  'getAllUsersWithRoles' : ActorMethod<[], Array<UserWithRole>>,
   'getAsset' : ActorMethod<[bigint], Asset>,
   'getAssetsByCategory' : ActorMethod<[AssetCategory], Array<Asset>>,
   'getAssetsByLocation' : ActorMethod<[string], Array<Asset>>,
@@ -115,6 +124,7 @@ export interface _SERVICE {
   'getHistoryForAsset' : ActorMethod<[bigint], Array<AssignmentHistoryEntry>>,
   'getStats' : ActorMethod<[], Stats>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getWarrantyStats' : ActorMethod<[], WarrantyStats>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,

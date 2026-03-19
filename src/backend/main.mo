@@ -102,6 +102,11 @@ actor {
     active : Nat;
   };
 
+  public type UserWithRole = {
+    principal : Principal.Principal;
+    role : AccessControl.UserRole;
+  };
+
   // Store Types
   public type StoreAsset = {
     id : Nat;
@@ -300,6 +305,31 @@ actor {
     id;
   };
 
+  // Bootstrap admin - allows first user to become admin with no existing admins
+  public shared ({ caller }) func bootstrapAdmin() : async Bool {
+    if (caller.isAnonymous()) {
+      return false;
+    };
+    // Only allow bootstrap if no admin has been assigned yet
+    if (accessControlState.adminAssigned) {
+      return false;
+    };
+    // Directly assign this caller as admin
+    accessControlState.userRoles.add(caller, #admin);
+    accessControlState.adminAssigned := true;
+    true;
+  };
+
+  // Get all users with their roles (admin only)
+  public query ({ caller }) func getAllUsersWithRoles() : async [UserWithRole] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can view user roles");
+    };
+    accessControlState.userRoles.entries().map(
+      func((p, r)) : UserWithRole { { principal = p; role = r } }
+    ).toArray();
+  };
+
   // User Profile Functions
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -476,5 +506,20 @@ actor {
       available;
     };
   };
-};
 
+  public query ({ caller }) func getWarrantyStats() : async WarrantyStats {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can perform this action");
+    };
+
+    let allAssets = assets.values().toArray();
+    let total = allAssets.filter(func(asset) { asset.warrantyDate != null }).size();
+
+    {
+      total;
+      expiringSoon = 0;
+      expired = 0;
+      active = total;
+    };
+  };
+};
