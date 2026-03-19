@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BarChart3, Download, Package, Wrench } from "lucide-react";
+import { ArrowLeft, BarChart3, Download, Package, Wrench } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
@@ -103,7 +103,7 @@ function exportCSV(assets: Asset[]) {
   URL.revokeObjectURL(url);
 }
 
-export function ReportsPage() {
+export function ReportsPage({ onBack }: { onBack?: () => void }) {
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: stats, isLoading: statsLoading } = useGetStats();
 
@@ -136,6 +136,18 @@ export function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {onBack && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="self-start -ml-1 text-muted-foreground hover:text-foreground"
+          data-ocid="reports.secondary_button"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Back to Dashboard
+        </Button>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

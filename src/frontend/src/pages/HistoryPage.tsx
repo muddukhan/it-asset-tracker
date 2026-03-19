@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -9,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowRight, Clock, History, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock, History, Search } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import type { AssignmentHistoryEntry } from "../backend";
@@ -52,7 +53,7 @@ function StatusPill({ label }: { label: string }) {
 
 const SKELETONS = ["h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8"] as const;
 
-export function HistoryPage() {
+export function HistoryPage({ onBack }: { onBack?: () => void }) {
   const { data: history, isLoading } = useGetHistory();
   const [search, setSearch] = useState("");
 
@@ -72,6 +73,18 @@ export function HistoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {onBack && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="self-start -ml-1 text-muted-foreground hover:text-foreground"
+          data-ocid="history.secondary_button"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Back to Dashboard
+        </Button>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

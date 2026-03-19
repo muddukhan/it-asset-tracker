@@ -37,6 +37,7 @@ type FormState = {
   status: AssetStatus;
   location: string;
   assignedUser: string;
+  employeeCode: string;
   purchaseDate: string;
   warrantyDate: string;
   notes: string;
@@ -49,6 +50,7 @@ const defaultForm: FormState = {
   status: AssetStatus.available,
   location: "",
   assignedUser: "",
+  employeeCode: "",
   purchaseDate: "",
   warrantyDate: "",
   notes: "",
@@ -73,6 +75,7 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
         status: asset.status,
         location: asset.location,
         assignedUser: asset.assignedUser ?? "",
+        employeeCode: (asset as any).employeeCode ?? "",
         purchaseDate: asset.purchaseDate ?? "",
         warrantyDate: asset.warrantyDate ?? "",
         notes: asset.notes ?? "",
@@ -126,13 +129,14 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
     } else if (asset?.photoId) {
       photoId = asset.photoId;
     }
-    const input: AssetInput = {
+    const input: AssetInput & { employeeCode?: string } = {
       name: form.name,
       serialNumber: form.serialNumber,
       category: form.category,
       status: form.status,
       location: form.location,
       assignedUser: form.assignedUser || undefined,
+      employeeCode: form.employeeCode || undefined,
       purchaseDate: form.purchaseDate || undefined,
       warrantyDate: form.warrantyDate || undefined,
       notes: form.notes || undefined,
@@ -314,13 +318,23 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 data-ocid="asset.input"
               />
             </div>
-            <div className="space-y-1.5 col-span-2">
+            <div className="space-y-1.5">
               <Label htmlFor="assignedUser">Assigned User</Label>
               <Input
                 id="assignedUser"
                 value={form.assignedUser}
                 onChange={(e) => set("assignedUser")(e.target.value)}
                 placeholder="e.g. john.doe@company.com"
+                data-ocid="asset.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="employeeCode">Employee Code</Label>
+              <Input
+                id="employeeCode"
+                value={form.employeeCode}
+                onChange={(e) => set("employeeCode")(e.target.value)}
+                placeholder="e.g. EMP-001"
                 data-ocid="asset.input"
               />
             </div>

@@ -1,27 +1,30 @@
 # IT Asset Tracker
 
 ## Current State
-The app has an Admin panel with a "Make Me Admin" button, but it fails for non-admins because `assignCallerUserRole` in MixinAuthorization requires the caller to already be an admin. There is no bootstrap mechanism. User management only shows assets-by-assignee, with no ability to list registered users or see their current roles.
+A full-stack IT Asset Tracker on ICP. Pages: Dashboard, Inventory, Assignments, History, Reports, Admin. The Inventory page has a "Back to Dashboard" button (only when navigated from Dashboard). Asset form (AssetModal) has fields: name, serial number, category, status, location, assignedUser, purchaseDate, warrantyDate, notes, photo. Backend Asset type mirrors these fields.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `bootstrapAdmin()` backend function: allows any caller to become admin, but ONLY if no admins currently exist (one-time bootstrap)
-- `getAllUsersWithRoles()` backend function: admin-only, returns list of all users and their current roles
-- User management section in Admin page: shows a table of all registered users with their principal IDs, display names, and current roles
-- Role assignment UI enhancements: clearly label access levels (Full Access = Admin, Standard Access = User, View Only = Guest)
+- "Back to Dashboard" button on History, Reports, and Admin pages (in addition to existing one on Inventory)
+- `employeeCode` field (optional text) to the Add/Edit Asset form
+- `employeeCode` displayed as a column in the Inventory table
+- `employeeCode` stored on the backend Asset type
 
 ### Modify
-- "Make Me Admin" button: call `bootstrapAdmin` instead of `assignCallerUserRole` so it actually works for unauthenticated first-time users
-- Admin panel layout: add a dedicated Users tab or section with the user list table
+- `App.tsx`: pass `onBack` prop to History, Reports, Admin pages (already passed to Inventory)
+- `HistoryPage`, `ReportsPage`, `AdminPage`: accept optional `onBack` prop and render a back button
+- `AssetModal`: add Employee Code input field
+- `InventoryPage`: add Employee Code column in the table and display in asset detail
+- `backend/main.mo`: add `employeeCode: ?Text` to Asset, AssetInput, StoreAsset types and propagate through all CRUD functions
 
 ### Remove
-- Nothing removed
+- Nothing
 
 ## Implementation Plan
-1. Add `bootstrapAdmin()` public function in backend: checks if admin set is empty, then assigns caller as admin
-2. Add `getAllUsersWithRoles()` query in backend: returns array of {principal, role} for all known users
-3. Update `backend.d.ts` bindings after regeneration
-4. In `useQueries.ts`, add `useBootstrapAdmin` mutation and `useGetAllUsersWithRoles` query
-5. Update `AdminPage.tsx`: wire "Make Me Admin" to `bootstrapAdmin`, add Users section with table showing principal, role badge, and change-role dropdown
-6. Display roles with clear labels: Admin (Full Access), User (Standard Access), Guest (View Only)
+1. Update `main.mo` to add `employeeCode` field to all relevant types and logic
+2. Update `AssetModal.tsx` to add Employee Code field in the form
+3. Update `InventoryPage.tsx` to show Employee Code column
+4. Update `HistoryPage.tsx`, `ReportsPage.tsx`, `AdminPage.tsx` to accept `onBack` prop and show back button
+5. Update `App.tsx` to pass `onBack` to all pages
+6. Validate and deploy

@@ -43,12 +43,14 @@ actor {
     #inStorage;
   };
 
+  // Public Asset type (includes employeeCode for API consumers)
   public type Asset = {
     id : Nat;
     name : Text;
     category : AssetCategory;
     serialNumber : Text;
     assignedUser : ?Text;
+    employeeCode : ?Text;
     location : Text;
     status : AssetStatus;
     purchaseDate : ?Text;
@@ -64,6 +66,7 @@ actor {
     category : AssetCategory;
     serialNumber : Text;
     assignedUser : ?Text;
+    employeeCode : ?Text;
     location : Text;
     status : AssetStatus;
     purchaseDate : ?Text;
@@ -107,7 +110,8 @@ actor {
     role : AccessControl.UserRole;
   };
 
-  // Store Types
+  // Store Types — StoreAsset must NOT change shape to preserve stable variable compatibility.
+  // employeeCode is stored separately in assetEmployeeCodes.
   public type StoreAsset = {
     id : Nat;
     name : Text;
@@ -159,6 +163,27 @@ actor {
   let history = Map.empty<Nat, StoreAssignmentHistoryEntry>();
   let initialized = Set.empty<Nat>();
   let userProfiles = Map.empty<Principal.Principal, StoreUserProfile>();
+  // Separate stable map for employee codes — added without touching StoreAsset
+  let assetEmployeeCodes = Map.empty<Nat, Text>();
+
+  // Helper: merge StoreAsset with its employee code into the public Asset type
+  func toAsset(s : StoreAsset) : Asset {
+    {
+      id = s.id;
+      name = s.name;
+      category = s.category;
+      serialNumber = s.serialNumber;
+      assignedUser = s.assignedUser;
+      employeeCode = assetEmployeeCodes.get(s.id);
+      location = s.location;
+      status = s.status;
+      purchaseDate = s.purchaseDate;
+      warrantyDate = s.warrantyDate;
+      notes = s.notes;
+      photoId = s.photoId;
+      createdAt = s.createdAt;
+    };
+  };
 
   // System functions
   system func preupgrade() {};
@@ -178,6 +203,7 @@ actor {
         category = #laptop;
         serialNumber = "XPS123456";
         assignedUser = null;
+        employeeCode = null;
         location = "Office 101";
         status = #available;
         purchaseDate = ?"2022-01-15";
@@ -191,6 +217,7 @@ actor {
         category = #laptop;
         serialNumber = "HP987654";
         assignedUser = ?"Alice Smith";
+        employeeCode = null;
         location = "Remote";
         status = #assigned;
         purchaseDate = ?"2021-11-03";
@@ -204,6 +231,7 @@ actor {
         category = #desktop;
         serialNumber = "DESK1234";
         assignedUser = ?"Bob Jones";
+        employeeCode = null;
         location = "Office 102";
         status = #assigned;
         purchaseDate = ?"2020-08-25";
@@ -217,6 +245,7 @@ actor {
         category = #monitor;
         serialNumber = "MON456";
         assignedUser = null;
+        employeeCode = null;
         location = "Storage";
         status = #available;
         purchaseDate = ?"2022-05-10";
@@ -230,6 +259,7 @@ actor {
         category = #printer;
         serialNumber = "PRINTER789";
         assignedUser = null;
+        employeeCode = null;
         location = "Office 100";
         status = #inStorage;
         purchaseDate = ?"2019-04-30";
@@ -243,6 +273,7 @@ actor {
         category = #peripheral;
         serialNumber = "MOUSE123";
         assignedUser = ?"Carol Lee";
+        employeeCode = null;
         location = "Office 103";
         status = #assigned;
         purchaseDate = ?"2021-12-01";
@@ -256,6 +287,7 @@ actor {
         category = #server;
         serialNumber = "SERVER321";
         assignedUser = null;
+        employeeCode = null;
         location = "Data Center";
         status = #inRepair;
         purchaseDate = ?"2018-07-11";
@@ -269,6 +301,7 @@ actor {
         category = #laptop;
         serialNumber = "MBP111222";
         assignedUser = ?"David Kim";
+        employeeCode = null;
         location = "Remote";
         status = #assigned;
         purchaseDate = ?"2020-10-21";
@@ -302,6 +335,13 @@ actor {
     };
 
     assets.add(id, asset);
+
+    // Store employee code separately
+    switch (input.employeeCode) {
+      case (null) { assetEmployeeCodes.remove(id) };
+      case (?code) { assetEmployeeCodes.add(id, code) };
+    };
+
     id;
   };
 
@@ -386,6 +426,12 @@ actor {
           createdAt = existing.createdAt;
         };
 
+        // Update employee code in its separate map
+        switch (input.employeeCode) {
+          case (null) { assetEmployeeCodes.remove(id) };
+          case (?code) { assetEmployeeCodes.add(id, code) };
+        };
+
         addToHistory(id, caller, existing.status, input);
         assets.add(id, updated);
       };
@@ -398,6 +444,7 @@ actor {
     };
 
     assets.remove(id);
+    assetEmployeeCodes.remove(id);
   };
 
   public query ({ caller }) func getAsset(id : Nat) : async Asset {
@@ -406,7 +453,7 @@ actor {
     };
     switch (assets.get(id)) {
       case (null) { Runtime.trap("Asset not found") };
-      case (?asset) { asset };
+      case (?asset) { toAsset(asset) };
     };
   };
 
@@ -414,21 +461,21 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can perform this action");
     };
-    assets.values().map(func(a) { a }).toArray().sort();
+    assets.values().map(func(a) { toAsset(a) }).toArray().sort();
   };
 
   public query ({ caller }) func getAssetsByStatus(status : AssetStatus) : async [Asset] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can perform this action");
     };
-    assets.values().toArray().filter(func(asset) { asset.status == status }).sort();
+    assets.values().toArray().filter(func(asset) { asset.status == status }).map(toAsset).sort();
   };
 
   public query ({ caller }) func getAssetsByCategory(category : AssetCategory) : async [Asset] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can perform this action");
     };
-    assets.values().toArray().filter(func(asset) { asset.category == category }).sort();
+    assets.values().toArray().filter(func(asset) { asset.category == category }).map(toAsset).sort();
   };
 
   public query ({ caller }) func searchAssets(term : Text) : async [Asset] {
@@ -440,7 +487,7 @@ actor {
       func(asset) {
         asset.name.toLower().contains(#text(lowerTerm)) or asset.serialNumber.toLower().contains(#text(lowerTerm)) or asset.location.toLower().contains(#text(lowerTerm));
       }
-    ).sort();
+    ).map(toAsset).sort();
   };
 
   public query ({ caller }) func getAssetsByLocation(location : Text) : async [Asset] {
@@ -451,7 +498,7 @@ actor {
       func(asset) {
         asset.location.toLower().contains(#text(location.toLower()));
       }
-    ).sort();
+    ).map(toAsset).sort();
   };
 
   // History

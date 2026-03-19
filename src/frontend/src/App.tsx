@@ -126,11 +126,23 @@ function AppShell() {
       case "assignments":
         return <InventoryPage key="assigned" initialStatusFilter="assigned" />;
       case "history":
-        return <HistoryPage />;
+        return (
+          <HistoryPage
+            onBack={previousPage === "dashboard" ? goBack : undefined}
+          />
+        );
       case "reports":
-        return <ReportsPage />;
+        return (
+          <ReportsPage
+            onBack={previousPage === "dashboard" ? goBack : undefined}
+          />
+        );
       case "admin":
-        return <AdminPage />;
+        return (
+          <AdminPage
+            onBack={previousPage === "dashboard" ? goBack : undefined}
+          />
+        );
       default:
         return <DashboardPage onNavigate={navigate} />;
     }

@@ -325,6 +325,9 @@ export function InventoryPage({
                         Assigned To
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Emp Code
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Location
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -372,6 +375,9 @@ export function InventoryPage({
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {asset.assignedUser || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground font-mono">
+                            {(asset as any).employeeCode || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {asset.location}

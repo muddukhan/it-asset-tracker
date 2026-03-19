@@ -14,6 +14,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Hash,
   Image as ImageIcon,
   MapPin,
   Pencil,
@@ -285,6 +286,11 @@ export function AssetDetailModal({
                 icon={<User className="h-4 w-4" />}
                 label="Assigned To"
                 value={asset.assignedUser}
+              />
+              <DetailRow
+                icon={<Hash className="h-4 w-4" />}
+                label="Employee Code"
+                value={(asset as any).employeeCode}
               />
               <DetailRow
                 icon={<Calendar className="h-4 w-4" />}

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Principal } from "@icp-sdk/core/principal";
 import {
+  ArrowLeft,
   Loader2,
   Lock,
   ShieldCheck,
@@ -164,7 +165,7 @@ function UserRoleRow({
   );
 }
 
-export function AdminPage() {
+export function AdminPage({ onBack }: { onBack?: () => void }) {
   const { data: isAdmin, isLoading: adminLoading } = useIsCallerAdmin();
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: usersWithRoles, isLoading: usersLoading } =
@@ -351,6 +352,18 @@ export function AdminPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {onBack && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="self-start -ml-1 text-muted-foreground hover:text-foreground"
+          data-ocid="admin.secondary_button"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Back to Dashboard
+        </Button>
+      )}
       {/* Header */}
       <div>
         <h1
