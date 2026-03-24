@@ -1,27 +1,24 @@
-# Brandscapes Assets - Software Inventory
+# Brandscapes Assets
 
 ## Current State
-The app has Hardware Inventory, Assignments, History, Reports, and Admin pages. The backend handles IT hardware assets (laptops, servers, etc.) with CRUD, assignment history, and user roles.
+IT asset tracker. Asset fields: name, serialNumber, category, status, location, assignedUser, employeeCode, purchaseDate, warrantyDate, notes, photoId. Dashboard: KPI cards (Total, Assigned, In Repair, Available), quick filters, warranty alerts, category breakdown. Retired status in enum but no dashboard card.
 
 ## Requested Changes (Diff)
 
 ### Add
-- New "Software" nav item in sidebar and top nav
-- New `SoftwareInventoryPage` with a table showing: Software Name, Vendor Name, Date of Purchase, License Expiry, License Key (optional), License Type (optional), Notes
-- Add/Edit modal for software items with all fields
-- Delete with confirmation dialog
-- Search by name or vendor
-- Backend: SoftwareItem type and full CRUD (addSoftware, updateSoftware, deleteSoftware, getAllSoftware, getSoftware)
-- License expiry badge (valid / expiring soon / expired) similar to warranty badge
+- processorType, ram, storage optional string fields to Asset/AssetInput
+- Processor Type, RAM, Storage inputs in AssetModal
+- Retired stat card on Dashboard
+- Config details shown in Dashboard
 
 ### Modify
-- App.tsx: add "software" to NavPage type, navItems array, renderPage switch
-- Backend main.mo: add SoftwareItem, SoftwareInput types and CRUD functions
+- AssetModal: add hardware config fields
+- AssetDetailModal: show config fields in details
+- DashboardPage: Retired stat card + config info in asset rows
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. Update backend main.mo with software types and CRUD
-2. Create SoftwareInventoryPage.tsx with table, add/edit modal, delete confirm
-3. Update App.tsx to include Software nav item and route
+1. Regenerate backend with new fields
+2. Update AssetModal, AssetDetailModal, DashboardPage

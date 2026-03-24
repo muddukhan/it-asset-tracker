@@ -15,8 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
+import {
+  Cpu,
+  HardDrive,
+  Image as ImageIcon,
+  Loader2,
+  MemoryStick,
+  Upload,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Asset, AssetInput } from "../backend";
@@ -41,6 +50,9 @@ type FormState = {
   purchaseDate: string;
   warrantyDate: string;
   notes: string;
+  processorType: string;
+  ram: string;
+  storage: string;
 };
 
 const defaultForm: FormState = {
@@ -54,6 +66,9 @@ const defaultForm: FormState = {
   purchaseDate: "",
   warrantyDate: "",
   notes: "",
+  processorType: "",
+  ram: "",
+  storage: "",
 };
 
 export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
@@ -75,10 +90,13 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
         status: asset.status,
         location: asset.location,
         assignedUser: asset.assignedUser ?? "",
-        employeeCode: (asset as any).employeeCode ?? "",
+        employeeCode: asset.employeeCode ?? "",
         purchaseDate: asset.purchaseDate ?? "",
         warrantyDate: asset.warrantyDate ?? "",
         notes: asset.notes ?? "",
+        processorType: asset.processorType ?? "",
+        ram: asset.ram ?? "",
+        storage: asset.storage ?? "",
       });
       setExistingPhotoUrl(asset.photoId ? asset.photoId.getDirectURL() : null);
     } else {
@@ -129,7 +147,7 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
     } else if (asset?.photoId) {
       photoId = asset.photoId;
     }
-    const input: AssetInput & { employeeCode?: string } = {
+    const input: AssetInput = {
       name: form.name,
       serialNumber: form.serialNumber,
       category: form.category,
@@ -140,6 +158,9 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
       purchaseDate: form.purchaseDate || undefined,
       warrantyDate: form.warrantyDate || undefined,
       notes: form.notes || undefined,
+      processorType: form.processorType || undefined,
+      ram: form.ram || undefined,
+      storage: form.storage || undefined,
       photoId,
     };
     try {
@@ -370,6 +391,66 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
               />
             </div>
           </div>
+
+          {/* Hardware Configuration */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Separator className="flex-1" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 flex items-center gap-1.5">
+                <Cpu className="h-3.5 w-3.5" />
+                Hardware Configuration
+              </span>
+              <Separator className="flex-1" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5 col-span-2">
+                <Label htmlFor="processorType">
+                  <span className="flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                    Processor Type
+                  </span>
+                </Label>
+                <Input
+                  id="processorType"
+                  value={form.processorType}
+                  onChange={(e) => set("processorType")(e.target.value)}
+                  placeholder="e.g. Intel Core i7-12700"
+                  data-ocid="asset.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ram">
+                  <span className="flex items-center gap-1.5">
+                    <MemoryStick className="h-3.5 w-3.5 text-muted-foreground" />
+                    RAM
+                  </span>
+                </Label>
+                <Input
+                  id="ram"
+                  value={form.ram}
+                  onChange={(e) => set("ram")(e.target.value)}
+                  placeholder="e.g. 16GB DDR5"
+                  data-ocid="asset.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="storage">
+                  <span className="flex items-center gap-1.5">
+                    <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+                    Storage
+                  </span>
+                </Label>
+                <Input
+                  id="storage"
+                  value={form.storage}
+                  onChange={(e) => set("storage")(e.target.value)}
+                  placeholder="e.g. 512GB NVMe SSD"
+                  data-ocid="asset.input"
+                />
+              </div>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"

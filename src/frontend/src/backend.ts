@@ -152,23 +152,28 @@ export interface LocalUserInput {
 }
 export interface AssetInput {
     id?: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }
 export interface Asset {
     id: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     createdAt: Time;
     serialNumber: string;
@@ -176,6 +181,7 @@ export interface Asset {
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }
@@ -812,8 +818,8 @@ export class Backend implements backendInterface {
 function from_candid_AssetCategory_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _AssetCategory): AssetCategory {
     return from_candid_variant_n28(_uploadFile, _downloadFile, value);
 }
-function from_candid_AssetStatus_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _AssetStatus): AssetStatus {
-    return from_candid_variant_n25(_uploadFile, _downloadFile, value);
+function from_candid_AssetStatus_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _AssetStatus): AssetStatus {
+    return from_candid_variant_n26(_uploadFile, _downloadFile, value);
 }
 async function from_candid_Asset_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Asset): Promise<Asset> {
     return await from_candid_record_n23(_uploadFile, _downloadFile, value);
@@ -839,7 +845,7 @@ function from_candid_UserWithRole_n38(_uploadFile: (file: ExternalBlob) => Promi
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+function from_candid_opt_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
 async function from_candid_opt_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ExternalBlob]): Promise<ExternalBlob | null> {
@@ -856,9 +862,11 @@ function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
 }
 async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
+    ram: [] | [string];
     status: _AssetStatus;
     employeeCode: [] | [string];
     purchaseDate: [] | [string];
+    storage: [] | [string];
     name: string;
     createdAt: _Time;
     serialNumber: string;
@@ -866,13 +874,16 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     category: _AssetCategory;
     warrantyDate: [] | [string];
     assignedUser: [] | [string];
+    processorType: [] | [string];
     location: string;
     photoId: [] | [_ExternalBlob];
 }): Promise<{
     id: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     createdAt: Time;
     serialNumber: string;
@@ -880,21 +891,25 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }> {
     return {
         id: value.id,
-        status: from_candid_AssetStatus_n24(_uploadFile, _downloadFile, value.status),
-        employeeCode: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.employeeCode)),
-        purchaseDate: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.purchaseDate)),
+        ram: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.ram)),
+        status: from_candid_AssetStatus_n25(_uploadFile, _downloadFile, value.status),
+        employeeCode: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.employeeCode)),
+        purchaseDate: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.purchaseDate)),
+        storage: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.storage)),
         name: value.name,
         createdAt: value.createdAt,
         serialNumber: value.serialNumber,
-        notes: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.notes)),
+        notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
         category: from_candid_AssetCategory_n27(_uploadFile, _downloadFile, value.category),
-        warrantyDate: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.warrantyDate)),
-        assignedUser: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.assignedUser)),
+        warrantyDate: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.warrantyDate)),
+        assignedUser: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assignedUser)),
+        processorType: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.processorType)),
         location: value.location,
         photoId: record_opt_to_undefined(await from_candid_opt_n29(_uploadFile, _downloadFile, value.photoId))
     };
@@ -919,7 +934,7 @@ function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uin
         employeeCode: value.employeeCode,
         name: value.name,
         email: value.email,
-        notes: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.notes)),
+        notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
         department: value.department
     };
 }
@@ -946,14 +961,14 @@ function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         id: value.id,
-        purchaseDate: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.purchaseDate)),
+        purchaseDate: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.purchaseDate)),
         name: value.name,
         createdAt: value.createdAt,
-        licenseType: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.licenseType)),
+        licenseType: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseType)),
         vendor: value.vendor,
-        notes: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.notes)),
-        licenseKey: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.licenseKey)),
-        licenseExpiry: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.licenseExpiry))
+        notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
+        licenseKey: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseKey)),
+        licenseExpiry: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseExpiry))
     };
 }
 function from_candid_record_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -992,13 +1007,13 @@ function from_candid_record_n45(_uploadFile: (file: ExternalBlob) => Promise<Uin
     return {
         id: value.id,
         changedBy: value.changedBy,
-        toStatus: from_candid_AssetStatus_n24(_uploadFile, _downloadFile, value.toStatus),
+        toStatus: from_candid_AssetStatus_n25(_uploadFile, _downloadFile, value.toStatus),
         assetId: value.assetId,
-        fromStatus: from_candid_AssetStatus_n24(_uploadFile, _downloadFile, value.fromStatus),
-        toAssignee: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.toAssignee)),
+        fromStatus: from_candid_AssetStatus_n25(_uploadFile, _downloadFile, value.fromStatus),
+        toAssignee: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.toAssignee)),
         timestamp: value.timestamp,
         assetName: value.assetName,
-        fromAssignee: record_opt_to_undefined(from_candid_opt_n26(_uploadFile, _downloadFile, value.fromAssignee))
+        fromAssignee: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.fromAssignee))
     };
 }
 function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1013,7 +1028,7 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
         topped_up_amount: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.topped_up_amount))
     };
 }
-function from_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     assigned: null;
 } | {
     inStorage: null;
@@ -1156,42 +1171,51 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 }
 async function to_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id?: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }): Promise<{
     id: [] | [bigint];
+    ram: [] | [string];
     status: _AssetStatus;
     employeeCode: [] | [string];
     purchaseDate: [] | [string];
+    storage: [] | [string];
     name: string;
     serialNumber: string;
     notes: [] | [string];
     category: _AssetCategory;
     warrantyDate: [] | [string];
     assignedUser: [] | [string];
+    processorType: [] | [string];
     location: string;
     photoId: [] | [_ExternalBlob];
 }> {
     return {
         id: value.id ? candid_some(value.id) : candid_none(),
+        ram: value.ram ? candid_some(value.ram) : candid_none(),
         status: to_candid_AssetStatus_n10(_uploadFile, _downloadFile, value.status),
         employeeCode: value.employeeCode ? candid_some(value.employeeCode) : candid_none(),
         purchaseDate: value.purchaseDate ? candid_some(value.purchaseDate) : candid_none(),
+        storage: value.storage ? candid_some(value.storage) : candid_none(),
         name: value.name,
         serialNumber: value.serialNumber,
         notes: value.notes ? candid_some(value.notes) : candid_none(),
         category: to_candid_AssetCategory_n12(_uploadFile, _downloadFile, value.category),
         warrantyDate: value.warrantyDate ? candid_some(value.warrantyDate) : candid_none(),
         assignedUser: value.assignedUser ? candid_some(value.assignedUser) : candid_none(),
+        processorType: value.processorType ? candid_some(value.processorType) : candid_none(),
         location: value.location,
         photoId: value.photoId ? candid_some(await to_candid_ExternalBlob_n14(_uploadFile, _downloadFile, value.photoId)) : candid_none()
     };

@@ -12,9 +12,11 @@ import type { Principal } from '@icp-sdk/core/principal';
 
 export interface Asset {
   'id' : bigint,
+  'ram' : [] | [string],
   'status' : AssetStatus,
   'employeeCode' : [] | [string],
   'purchaseDate' : [] | [string],
+  'storage' : [] | [string],
   'name' : string,
   'createdAt' : Time,
   'serialNumber' : string,
@@ -22,6 +24,7 @@ export interface Asset {
   'category' : AssetCategory,
   'warrantyDate' : [] | [string],
   'assignedUser' : [] | [string],
+  'processorType' : [] | [string],
   'location' : string,
   'photoId' : [] | [ExternalBlob],
 }
@@ -34,15 +37,18 @@ export type AssetCategory = { 'desktop' : null } |
   { 'peripheral' : null };
 export interface AssetInput {
   'id' : [] | [bigint],
+  'ram' : [] | [string],
   'status' : AssetStatus,
   'employeeCode' : [] | [string],
   'purchaseDate' : [] | [string],
+  'storage' : [] | [string],
   'name' : string,
   'serialNumber' : string,
   'notes' : [] | [string],
   'category' : AssetCategory,
   'warrantyDate' : [] | [string],
   'assignedUser' : [] | [string],
+  'processorType' : [] | [string],
   'location' : string,
   'photoId' : [] | [ExternalBlob],
 }

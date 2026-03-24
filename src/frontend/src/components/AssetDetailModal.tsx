@@ -14,9 +14,12 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Cpu,
+  HardDrive,
   Hash,
   Image as ImageIcon,
   MapPin,
+  MemoryStick,
   Pencil,
   Tag,
   Trash2,
@@ -182,6 +185,12 @@ export function AssetDetailModal({
 }: Props) {
   if (!asset) return null;
 
+  const hasHardwareConfig = !!(
+    asset.processorType ||
+    asset.ram ||
+    asset.storage
+  );
+
   return (
     <Dialog open={!!asset} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
@@ -290,7 +299,7 @@ export function AssetDetailModal({
               <DetailRow
                 icon={<Hash className="h-4 w-4" />}
                 label="Employee Code"
-                value={(asset as any).employeeCode}
+                value={asset.employeeCode}
               />
               <DetailRow
                 icon={<Calendar className="h-4 w-4" />}
@@ -303,6 +312,36 @@ export function AssetDetailModal({
                 value={asset.warrantyDate}
               />
             </div>
+
+            {/* Hardware Configuration */}
+            {hasHardwareConfig && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5" />
+                    Hardware Configuration
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <DetailRow
+                      icon={<Cpu className="h-4 w-4" />}
+                      label="Processor"
+                      value={asset.processorType}
+                    />
+                    <DetailRow
+                      icon={<MemoryStick className="h-4 w-4" />}
+                      label="RAM"
+                      value={asset.ram}
+                    />
+                    <DetailRow
+                      icon={<HardDrive className="h-4 w-4" />}
+                      label="Storage"
+                      value={asset.storage}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {asset.notes && (
               <>

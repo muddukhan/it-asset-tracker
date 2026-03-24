@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
+  Archive,
   BarChart3,
   CheckCircle2,
   Clock,
   Cpu,
   HardDrive,
   Laptop,
+  MemoryStick,
   Monitor,
   Package,
   Printer,
@@ -23,7 +25,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useGetAllAssets, useGetStats } from "../hooks/useQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
 
-const STAT_SKELETONS = ["s1", "s2", "s3", "s4"] as const;
+const STAT_SKELETONS = ["s1", "s2", "s3", "s4", "s5"] as const;
 
 const categoryIcons: Record<AssetCategory, React.ReactNode> = {
   [AssetCategory.laptop]: <Laptop className="h-5 w-5" />,
@@ -93,6 +95,11 @@ export function DashboardPage({ onNavigate }: Props) {
     day: "numeric",
   });
 
+  const retiredCount = useMemo(() => {
+    if (!assets) return 0;
+    return assets.filter((a) => a.status === AssetStatus.retired).length;
+  }, [assets]);
+
   const warrantyAlerts = useMemo(() => {
     if (!assets) return [];
     return assets
@@ -119,6 +126,13 @@ export function DashboardPage({ onNavigate }: Props) {
       .map(([cat, count]) => ({ cat: cat as AssetCategory, count }));
   }, [assets]);
 
+  const hardwareConfigAssets = useMemo(() => {
+    if (!assets) return [];
+    return assets
+      .filter((a) => a.processorType || a.ram || a.storage)
+      .slice(0, 5);
+  }, [assets]);
+
   const maxCategoryCount = Math.max(
     ...categoryBreakdown.map((c) => c.count),
     1,
@@ -133,8 +147,8 @@ export function DashboardPage({ onNavigate }: Props) {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsLoading ? (
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {statsLoading || assetsLoading ? (
           STAT_SKELETONS.map((k) => (
             <Skeleton key={k} className="h-24 rounded-xl" />
           ))
@@ -172,6 +186,14 @@ export function DashboardPage({ onNavigate }: Props) {
               index={3}
               onClick={() => onNavigate?.("inventory", "available")}
             />
+            <StatCard
+              label="Retired"
+              value={retiredCount}
+              icon={<Archive className="h-5 w-5" />}
+              accentColor="oklch(var(--muted-foreground))"
+              index={4}
+              onClick={() => onNavigate?.("inventory", AssetStatus.retired)}
+            />
           </>
         )}
       </div>
@@ -186,6 +208,7 @@ export function DashboardPage({ onNavigate }: Props) {
           { label: "In Repair", filter: AssetStatus.inRepair },
           { label: "Assigned", filter: AssetStatus.assigned },
           { label: "In Storage", filter: AssetStatus.inStorage },
+          { label: "Retired", filter: AssetStatus.retired },
         ].map((item) => (
           <Button
             key={item.filter}
@@ -360,6 +383,89 @@ export function DashboardPage({ onNavigate }: Props) {
           )}
         </motion.div>
       </div>
+
+      {/* Hardware Configs panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.35 }}
+        className="rounded-xl border shadow-card bg-card overflow-hidden"
+      >
+        <div className="px-5 py-4 border-b flex items-center gap-2">
+          <Cpu className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-semibold text-base text-foreground">
+            Asset Hardware Specs
+          </h2>
+          <span className="ml-auto text-xs text-muted-foreground">
+            Assets with configuration details
+          </span>
+        </div>
+        {assetsLoading ? (
+          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+            {["h1", "h2", "h3"].map((k) => (
+              <Skeleton key={k} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : hardwareConfigAssets.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-10 gap-2"
+            data-ocid="dashboard.empty_state"
+          >
+            <Cpu className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              No hardware specs added yet. Edit an asset to add processor, RAM,
+              and storage info.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {hardwareConfigAssets.map((asset, i) => {
+              return (
+                <li
+                  key={String(asset.id)}
+                  className="px-5 py-3 flex items-center gap-4 hover:bg-muted/20 transition-colors"
+                  data-ocid={`dashboard.item.${i + 1}`}
+                >
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground">
+                    {categoryIcons[asset.category]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {asset.name}
+                      </p>
+                      <StatusBadge status={asset.status} />
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {asset.processorType && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Cpu className="h-3 w-3" />
+                          {asset.processorType}
+                        </span>
+                      )}
+                      {asset.ram && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MemoryStick className="h-3 w-3" />
+                          {asset.ram}
+                        </span>
+                      )}
+                      {asset.storage && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <HardDrive className="h-3 w-3" />
+                          {asset.storage}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground capitalize flex-shrink-0">
+                    {asset.category}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </motion.div>
     </div>
   );
 }

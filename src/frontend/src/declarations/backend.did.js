@@ -38,15 +38,18 @@ export const AssetCategory = IDL.Variant({
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const AssetInput = IDL.Record({
   'id' : IDL.Opt(IDL.Nat),
+  'ram' : IDL.Opt(IDL.Text),
   'status' : AssetStatus,
   'employeeCode' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
+  'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'serialNumber' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'category' : AssetCategory,
   'warrantyDate' : IDL.Opt(IDL.Text),
   'assignedUser' : IDL.Opt(IDL.Text),
+  'processorType' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
   'photoId' : IDL.Opt(ExternalBlob),
 });
@@ -75,9 +78,11 @@ export const UserRole = IDL.Variant({
 export const Time = IDL.Int;
 export const Asset = IDL.Record({
   'id' : IDL.Nat,
+  'ram' : IDL.Opt(IDL.Text),
   'status' : AssetStatus,
   'employeeCode' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
+  'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'createdAt' : Time,
   'serialNumber' : IDL.Text,
@@ -85,6 +90,7 @@ export const Asset = IDL.Record({
   'category' : AssetCategory,
   'warrantyDate' : IDL.Opt(IDL.Text),
   'assignedUser' : IDL.Opt(IDL.Text),
+  'processorType' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
   'photoId' : IDL.Opt(ExternalBlob),
 });
@@ -244,15 +250,18 @@ export const idlFactory = ({ IDL }) => {
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const AssetInput = IDL.Record({
     'id' : IDL.Opt(IDL.Nat),
+    'ram' : IDL.Opt(IDL.Text),
     'status' : AssetStatus,
     'employeeCode' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
+    'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'serialNumber' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'category' : AssetCategory,
     'warrantyDate' : IDL.Opt(IDL.Text),
     'assignedUser' : IDL.Opt(IDL.Text),
+    'processorType' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
     'photoId' : IDL.Opt(ExternalBlob),
   });
@@ -281,9 +290,11 @@ export const idlFactory = ({ IDL }) => {
   const Time = IDL.Int;
   const Asset = IDL.Record({
     'id' : IDL.Nat,
+    'ram' : IDL.Opt(IDL.Text),
     'status' : AssetStatus,
     'employeeCode' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
+    'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'createdAt' : Time,
     'serialNumber' : IDL.Text,
@@ -291,6 +302,7 @@ export const idlFactory = ({ IDL }) => {
     'category' : AssetCategory,
     'warrantyDate' : IDL.Opt(IDL.Text),
     'assignedUser' : IDL.Opt(IDL.Text),
+    'processorType' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
     'photoId' : IDL.Opt(ExternalBlob),
   });

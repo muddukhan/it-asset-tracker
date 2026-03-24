@@ -70,23 +70,28 @@ export interface LocalUserInput {
 }
 export interface AssetInput {
     id?: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }
 export interface Asset {
     id: bigint;
+    ram?: string;
     status: AssetStatus;
     employeeCode?: string;
     purchaseDate?: string;
+    storage?: string;
     name: string;
     createdAt: Time;
     serialNumber: string;
@@ -94,6 +99,7 @@ export interface Asset {
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    processorType?: string;
     location: string;
     photoId?: ExternalBlob;
 }

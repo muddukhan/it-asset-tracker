@@ -76,6 +76,9 @@ actor {
     notes : ?Text;
     photoId : ?Storage.ExternalBlob;
     createdAt : Time.Time;
+    processorType : ?Text;
+    ram : ?Text;
+    storage : ?Text;
   };
 
   public type AssetInput = {
@@ -91,6 +94,9 @@ actor {
     warrantyDate : ?Text;
     notes : ?Text;
     photoId : ?Storage.ExternalBlob;
+    processorType : ?Text;
+    ram : ?Text;
+    storage : ?Text;
   };
 
   public type AssignmentHistoryEntry = {
@@ -154,7 +160,6 @@ actor {
 
   // Store Types — Do NOT change shape to preserve compatibility with (de)serialization!
   // StoreAsset must NOT change shape to preserve stable variable compatibility
-  // employeeCode is stored separately in assetEmployeeCodes
   public type StoreAsset = {
     id : Nat;
     name : Text;
@@ -168,6 +173,9 @@ actor {
     notes : ?Text;
     photoId : ?Storage.ExternalBlob;
     createdAt : Time.Time;
+    processorType : ?Text;
+    ram : ?Text;
+    storage : ?Text;
   };
 
   public type StoreAssignmentHistoryEntry = {
@@ -243,6 +251,9 @@ actor {
       notes = s.notes;
       photoId = s.photoId;
       createdAt = s.createdAt;
+      processorType = s.processorType;
+      ram = s.ram;
+      storage = s.storage;
     };
   };
 
@@ -350,6 +361,9 @@ actor {
         warrantyDate = ?"2025-01-15";
         notes = ?"Ultrabook";
         photoId = null;
+        processorType = ?"Intel i7";
+        ram = ?"16GB";
+        storage = ?"512GB SSD";
       },
       {
         id = null;
@@ -364,6 +378,9 @@ actor {
         warrantyDate = ?"2024-11-03";
         notes = ?"Travel laptop";
         photoId = null;
+        processorType = ?"Intel i5";
+        ram = ?"8GB";
+        storage = ?"256GB SSD";
       },
       {
         id = null;
@@ -378,6 +395,9 @@ actor {
         warrantyDate = ?"2023-08-25";
         notes = null;
         photoId = null;
+        processorType = ?"Intel i7";
+        ram = ?"32GB";
+        storage = ?"1TB HDD";
       },
       {
         id = null;
@@ -392,6 +412,9 @@ actor {
         warrantyDate = ?"2024-05-10";
         notes = ?"Spare";
         photoId = null;
+        processorType = null;
+        ram = null;
+        storage = null;
       },
       {
         id = null;
@@ -406,6 +429,9 @@ actor {
         warrantyDate = ?"2022-04-30";
         notes = ?"Shared printer";
         photoId = null;
+        processorType = null;
+        ram = null;
+        storage = null;
       },
       {
         id = null;
@@ -420,6 +446,9 @@ actor {
         warrantyDate = ?"2023-12-01";
         notes = null;
         photoId = null;
+        processorType = null;
+        ram = null;
+        storage = null;
       },
       {
         id = null;
@@ -434,6 +463,9 @@ actor {
         warrantyDate = ?"2023-07-11";
         notes = ?"Production server";
         photoId = null;
+        processorType = ?"Intel Xeon";
+        ram = ?"128GB";
+        storage = ?"4TB SSD";
       },
       {
         id = null;
@@ -448,6 +480,9 @@ actor {
         warrantyDate = ?"2023-10-21";
         notes = null;
         photoId = null;
+        processorType = ?"Apple M1";
+        ram = ?"16GB";
+        storage = ?"1TB SSD";
       },
     ];
 
@@ -472,6 +507,9 @@ actor {
       notes = input.notes;
       photoId = input.photoId;
       createdAt = Time.now();
+      processorType = input.processorType;
+      ram = input.ram;
+      storage = input.storage;
     };
 
     assets.add(id, asset);
@@ -633,6 +671,9 @@ actor {
           notes = input.notes;
           photoId = input.photoId;
           createdAt = existing.createdAt;
+          processorType = input.processorType;
+          ram = input.ram;
+          storage = input.storage;
         };
 
         // Update employee code in its separate map
