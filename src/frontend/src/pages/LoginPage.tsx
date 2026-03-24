@@ -33,7 +33,7 @@ export function LoginPage() {
               className="text-2xl font-bold tracking-tight"
               style={{ color: "oklch(var(--navbar))" }}
             >
-              AssetVue
+              Brandscapes Assets
             </span>
           </div>
 

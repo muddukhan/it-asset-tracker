@@ -178,7 +178,7 @@ function AppShell() {
             A
           </div>
           <span className="text-white font-bold text-lg tracking-tight">
-            AssetVue
+            Brandscapes Assets
           </span>
         </div>
 
