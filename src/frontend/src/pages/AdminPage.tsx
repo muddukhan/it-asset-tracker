@@ -18,28 +18,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { Principal } from "@icp-sdk/core/principal";
 import {
   ArrowLeft,
   Loader2,
   Lock,
+  Pencil,
+  Plus,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UserCog,
   Users,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend";
-import type { UserWithRole } from "../backend";
+import type { LocalUser, LocalUserInput, UserWithRole } from "../backend";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useAddLocalUser,
   useAssignUserRole,
   useBootstrapAdmin,
+  useDeleteLocalUser,
   useGetAllAssets,
+  useGetAllLocalUsers,
   useGetAllUsersWithRoles,
   useIsCallerAdmin,
+  useUpdateLocalUser,
 } from "../hooks/useQueries";
 
 function roleBadge(role: UserRole) {
@@ -165,17 +173,355 @@ function UserRoleRow({
   );
 }
 
+const emptyLocalUserForm = (): LocalUserInput => ({
+  name: "",
+  employeeCode: "",
+  department: "",
+  email: "",
+  notes: "",
+});
+
+function LocalUserRow({
+  user,
+  index,
+}: {
+  user: LocalUser;
+  index: number;
+}) {
+  const updateMutation = useUpdateLocalUser();
+  const deleteMutation = useDeleteLocalUser();
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [form, setForm] = useState<LocalUserInput>({
+    name: user.name,
+    employeeCode: user.employeeCode,
+    department: user.department,
+    email: user.email,
+    notes: user.notes ?? "",
+  });
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({ id: user.id, input: form });
+      toast.success("User updated");
+      setEditing(false);
+    } catch {
+      toast.error("Failed to update user");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteMutation.mutateAsync(user.id);
+      toast.success("User deleted");
+    } catch {
+      toast.error("Failed to delete user");
+    }
+  };
+
+  if (editing) {
+    return (
+      <TableRow data-ocid={`localusers.item.${index}`}>
+        <TableCell colSpan={5}>
+          <div className="flex flex-col gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Name *</Label>
+                <Input
+                  className="h-8 text-sm"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">User ID</Label>
+                <Input
+                  className="h-8 text-sm"
+                  value={form.employeeCode}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, employeeCode: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Department</Label>
+                <Input
+                  className="h-8 text-sm"
+                  value={form.department}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, department: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Email</Label>
+                <Input
+                  className="h-8 text-sm"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, email: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Notes</Label>
+              <Textarea
+                className="text-sm min-h-[60px] resize-none"
+                value={form.notes ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, notes: e.target.value }))
+                }
+                data-ocid="localusers.textarea"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                data-ocid="localusers.save_button"
+                style={{
+                  backgroundColor: "oklch(var(--primary))",
+                  color: "white",
+                }}
+              >
+                {updateMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : null}
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={() => setEditing(false)}
+                data-ocid="localusers.cancel_button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow data-ocid={`localusers.item.${index}`}>
+      <TableCell className="font-medium text-sm">{user.name}</TableCell>
+      <TableCell className="text-sm font-mono">{user.employeeCode}</TableCell>
+      <TableCell className="text-sm text-muted-foreground">
+        {user.department || "—"}
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground">
+        {user.email || "—"}
+      </TableCell>
+      <TableCell className="text-right">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2 justify-end">
+            <span className="text-xs text-muted-foreground">Delete?</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              data-ocid="localusers.confirm_button"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                "Yes"
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setConfirmDelete(false)}
+              data-ocid="localusers.cancel_button"
+            >
+              No
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setEditing(true)}
+              data-ocid={`localusers.edit_button.${index}`}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirmDelete(true)}
+              data-ocid={`localusers.delete_button.${index}`}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete
+            </Button>
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function AddLocalUserForm({ onClose }: { onClose: () => void }) {
+  const addMutation = useAddLocalUser();
+  const [form, setForm] = useState<LocalUserInput>(emptyLocalUserForm());
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    try {
+      await addMutation.mutateAsync(form);
+      toast.success("User added successfully");
+      onClose();
+    } catch {
+      toast.error("Failed to add user");
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2 }}
+      className="overflow-hidden"
+    >
+      <div
+        className="mx-5 mb-4 rounded-xl border p-5 flex flex-col gap-4"
+        style={{
+          backgroundColor: "oklch(var(--muted) / 0.3)",
+          borderColor: "oklch(var(--border))",
+        }}
+      >
+        <h3 className="font-semibold text-sm text-foreground">Add New User</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Name *</Label>
+            <Input
+              className="h-9 text-sm"
+              placeholder="Full name"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              data-ocid="localusers.input"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">User ID</Label>
+            <Input
+              className="h-9 text-sm"
+              placeholder="e.g. USR001"
+              value={form.employeeCode}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, employeeCode: e.target.value }))
+              }
+              data-ocid="localusers.input"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Department</Label>
+            <Input
+              className="h-9 text-sm"
+              placeholder="e.g. IT, HR, Finance"
+              value={form.department}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, department: e.target.value }))
+              }
+              data-ocid="localusers.input"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Email</Label>
+            <Input
+              className="h-9 text-sm"
+              type="email"
+              placeholder="user@company.com"
+              value={form.email}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, email: e.target.value }))
+              }
+              data-ocid="localusers.input"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs">Notes</Label>
+          <Textarea
+            className="text-sm min-h-[70px] resize-none"
+            placeholder="Optional notes about this user"
+            value={form.notes ?? ""}
+            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            data-ocid="localusers.textarea"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            className="h-9"
+            onClick={handleSubmit}
+            disabled={addMutation.isPending}
+            data-ocid="localusers.submit_button"
+            style={{ backgroundColor: "oklch(var(--primary))", color: "white" }}
+          >
+            {addMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
+            {addMutation.isPending ? "Adding…" : "Add User"}
+          </Button>
+          <Button
+            variant="outline"
+            className="h-9"
+            onClick={onClose}
+            data-ocid="localusers.cancel_button"
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function AdminPage({ onBack }: { onBack?: () => void }) {
   const { data: isAdmin, isLoading: adminLoading } = useIsCallerAdmin();
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: usersWithRoles, isLoading: usersLoading } =
     useGetAllUsersWithRoles(isAdmin ?? false);
+  const { data: localUsers, isLoading: localUsersLoading } =
+    useGetAllLocalUsers();
   const assignRole = useAssignUserRole();
   const bootstrapAdmin = useBootstrapAdmin();
   const { identity } = useInternetIdentity();
 
   const [principalInput, setPrincipalInput] = useState("");
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.user);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const myPrincipal = identity?.getPrincipal().toString() ?? "";
 
@@ -277,7 +623,7 @@ export function AdminPage({ onBack }: { onBack?: () => void }) {
             Admin Access Required
           </h2>
           <p className="text-sm text-muted-foreground mt-1.5">
-            You don't have administrator privileges to view this page.
+            You don&apos;t have administrator privileges to view this page.
           </p>
         </div>
 
@@ -304,7 +650,7 @@ export function AdminPage({ onBack }: { onBack?: () => void }) {
                 Grant Yourself Admin Access
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                If you're the system owner, click below to instantly assign
+                If you&apos;re the system owner, click below to instantly assign
                 yourself the admin role. Only works if no admin exists yet.
               </p>
             </div>
@@ -403,7 +749,7 @@ export function AdminPage({ onBack }: { onBack?: () => void }) {
             className="text-xs mb-4"
             style={{ color: "oklch(var(--muted-foreground))" }}
           >
-            Grant or change a user's access level by their principal ID
+            Grant or change a user&apos;s access level by their principal ID
           </p>
 
           {/* Fill My Principal quick button */}
@@ -630,6 +976,102 @@ export function AdminPage({ onBack }: { onBack?: () => void }) {
                   index={i + 1}
                   myPrincipal={myPrincipal}
                 />
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </motion.div>
+
+      {/* Local Users */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.35 }}
+        className="rounded-xl border shadow-card overflow-hidden"
+        style={{
+          backgroundColor: "oklch(var(--card))",
+          borderColor: "oklch(var(--border))",
+        }}
+      >
+        <div
+          className="px-5 py-4 border-b flex items-center gap-2"
+          style={{ borderColor: "oklch(var(--border))" }}
+        >
+          <Users
+            className="h-4 w-4"
+            style={{ color: "oklch(var(--muted-foreground))" }}
+          />
+          <h2 className="font-semibold text-base text-foreground">
+            Local Users
+          </h2>
+          {localUsers && (
+            <Badge variant="secondary" className="ml-2">
+              {localUsers.length} user
+              {localUsers.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
+          <div className="ml-auto">
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={() => setShowAddForm((v) => !v)}
+              style={{
+                backgroundColor: "oklch(var(--primary))",
+                color: "white",
+              }}
+              data-ocid="localusers.open_modal_button"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add User
+            </Button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {showAddForm && (
+            <AddLocalUserForm onClose={() => setShowAddForm(false)} />
+          )}
+        </AnimatePresence>
+
+        {localUsersLoading ? (
+          <div className="p-5 space-y-3" data-ocid="localusers.loading_state">
+            {["l1", "l2", "l3"].map((k) => (
+              <Skeleton key={k} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : !localUsers || localUsers.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 gap-2"
+            data-ocid="localusers.empty_state"
+          >
+            <Users
+              className="h-8 w-8"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            />
+            <p
+              className="text-sm"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            >
+              No users added yet
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Click &quot;Add User&quot; above to add your first user
+            </p>
+          </div>
+        ) : (
+          <Table data-ocid="localusers.table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>User ID</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {localUsers.map((u, i) => (
+                <LocalUserRow key={u.id.toString()} user={u} index={i + 1} />
               ))}
             </TableBody>
           </Table>

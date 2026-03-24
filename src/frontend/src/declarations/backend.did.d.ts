@@ -13,6 +13,7 @@ import type { Principal } from '@icp-sdk/core/principal';
 export interface Asset {
   'id' : bigint,
   'status' : AssetStatus,
+  'employeeCode' : [] | [string],
   'purchaseDate' : [] | [string],
   'name' : string,
   'createdAt' : Time,
@@ -34,6 +35,7 @@ export type AssetCategory = { 'desktop' : null } |
 export interface AssetInput {
   'id' : [] | [bigint],
   'status' : AssetStatus,
+  'employeeCode' : [] | [string],
   'purchaseDate' : [] | [string],
   'name' : string,
   'serialNumber' : string,
@@ -61,6 +63,21 @@ export interface AssignmentHistoryEntry {
   'fromAssignee' : [] | [string],
 }
 export type ExternalBlob = Uint8Array;
+export interface LocalUser {
+  'id' : bigint,
+  'employeeCode' : string,
+  'name' : string,
+  'email' : string,
+  'notes' : [] | [string],
+  'department' : string,
+}
+export interface LocalUserInput {
+  'employeeCode' : string,
+  'name' : string,
+  'email' : string,
+  'notes' : [] | [string],
+  'department' : string,
+}
 export type Principal = Principal;
 export interface Stats {
   'assigned' : bigint,
@@ -109,10 +126,13 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
+  'addLocalUser' : ActorMethod<[LocalUserInput], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'bootstrapAdmin' : ActorMethod<[], boolean>,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
+  'deleteLocalUser' : ActorMethod<[bigint], undefined>,
   'getAllAssets' : ActorMethod<[], Array<Asset>>,
+  'getAllLocalUsers' : ActorMethod<[], Array<LocalUser>>,
   'getAllUsersWithRoles' : ActorMethod<[], Array<UserWithRole>>,
   'getAsset' : ActorMethod<[bigint], Asset>,
   'getAssetsByCategory' : ActorMethod<[AssetCategory], Array<Asset>>,
@@ -129,6 +149,7 @@ export interface _SERVICE {
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,
   'updateAsset' : ActorMethod<[bigint, AssetInput], undefined>,
+  'updateLocalUser' : ActorMethod<[bigint, LocalUserInput], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

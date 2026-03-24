@@ -10,11 +10,11 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-
 
 
 actor {
@@ -41,6 +41,23 @@ actor {
     #inRepair;
     #retired;
     #inStorage;
+  };
+
+  public type LocalUser = {
+    id : Nat;
+    name : Text;
+    employeeCode : Text;
+    department : Text;
+    email : Text;
+    notes : ?Text;
+  };
+
+  public type LocalUserInput = {
+    name : Text;
+    employeeCode : Text;
+    department : Text;
+    email : Text;
+    notes : ?Text;
   };
 
   // Public Asset type (includes employeeCode for API consumers)
@@ -143,6 +160,15 @@ actor {
     name : Text;
   };
 
+  public type StoreLocalUser = {
+    id : Nat;
+    name : Text;
+    employeeCode : Text;
+    department : Text;
+    email : Text;
+    notes : ?Text;
+  };
+
   module AssignmentHistoryEntry {
     public func compare(a : AssignmentHistoryEntry, b : AssignmentHistoryEntry) : Order.Order {
       Int.compare(b.timestamp, a.timestamp);
@@ -158,11 +184,13 @@ actor {
   // State
   var nextAssetId = 1;
   var nextHistoryId = 1;
+  var nextLocalUserId = 1;
 
   let assets = Map.empty<Nat, StoreAsset>();
   let history = Map.empty<Nat, StoreAssignmentHistoryEntry>();
   let initialized = Set.empty<Nat>();
   let userProfiles = Map.empty<Principal.Principal, StoreUserProfile>();
+  let localUsers = Map.empty<Nat, StoreLocalUser>();
   // Separate stable map for employee codes — added without touching StoreAsset
   let assetEmployeeCodes = Map.empty<Nat, Text>();
 
@@ -182,6 +210,18 @@ actor {
       notes = s.notes;
       photoId = s.photoId;
       createdAt = s.createdAt;
+    };
+  };
+
+  // Helper converter for LocalUser
+  func toLocalUser(storeUser : StoreLocalUser) : LocalUser {
+    {
+      id = storeUser.id;
+      name = storeUser.name;
+      employeeCode = storeUser.employeeCode;
+      department = storeUser.department;
+      email = storeUser.email;
+      notes = storeUser.notes;
     };
   };
 
@@ -343,6 +383,66 @@ actor {
     };
 
     id;
+  };
+
+  // Local Users CRUD
+  public shared ({ caller }) func addLocalUser(input : LocalUserInput) : async Nat {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can add local users");
+    };
+
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+
+    let localUser : StoreLocalUser = {
+      id;
+      name = input.name;
+      employeeCode = input.employeeCode;
+      department = input.department;
+      email = input.email;
+      notes = input.notes;
+    };
+
+    localUsers.add(id, localUser);
+    id;
+  };
+
+  public shared ({ caller }) func updateLocalUser(id : Nat, input : LocalUserInput) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can update local users");
+    };
+
+    switch (localUsers.get(id)) {
+      case (null) { Runtime.trap("Local user not found") };
+      case (?existing) {
+        let updated : StoreLocalUser = {
+          id = existing.id;
+          name = input.name;
+          employeeCode = input.employeeCode;
+          department = input.department;
+          email = input.email;
+          notes = input.notes;
+        };
+        localUsers.add(id, updated);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteLocalUser(id : Nat) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can delete local users");
+    };
+    if (not localUsers.containsKey(id)) {
+      Runtime.trap("Local user not found");
+    };
+    localUsers.remove(id);
+  };
+
+  public query ({ caller }) func getAllLocalUsers() : async [LocalUser] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can fetch local users");
+    };
+    localUsers.values().map(toLocalUser).toArray();
   };
 
   // Bootstrap admin - allows first user to become admin with no existing admins

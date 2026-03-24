@@ -43,9 +43,25 @@ export interface AssignmentHistoryEntry {
     assetName: string;
     fromAssignee?: string;
 }
+export interface LocalUser {
+    id: bigint;
+    employeeCode: string;
+    name: string;
+    email: string;
+    notes?: string;
+    department: string;
+}
+export interface LocalUserInput {
+    employeeCode: string;
+    name: string;
+    email: string;
+    notes?: string;
+    department: string;
+}
 export interface AssetInput {
     id?: bigint;
     status: AssetStatus;
+    employeeCode?: string;
     purchaseDate?: string;
     name: string;
     serialNumber: string;
@@ -59,6 +75,7 @@ export interface AssetInput {
 export interface Asset {
     id: bigint;
     status: AssetStatus;
+    employeeCode?: string;
     purchaseDate?: string;
     name: string;
     createdAt: Time;
@@ -96,10 +113,13 @@ export enum UserRole {
 }
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
+    addLocalUser(input: LocalUserInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
+    deleteLocalUser(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
+    getAllLocalUsers(): Promise<Array<LocalUser>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
     getAssetsByCategory(category: AssetCategory): Promise<Array<Asset>>;
@@ -116,4 +136,5 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
+    updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
 }

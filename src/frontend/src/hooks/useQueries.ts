@@ -5,6 +5,8 @@ import type {
   AssetCategory,
   AssetInput,
   AssetStatus,
+  LocalUser,
+  LocalUserInput,
   UserRole,
   UserWithRole,
 } from "../backend";
@@ -189,6 +191,63 @@ export function useDeleteAsset() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+export function useGetAllLocalUsers() {
+  const { actor, isFetching } = useActor();
+  return useQuery<LocalUser[]>({
+    queryKey: ["localUsers"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllLocalUsers();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddLocalUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: LocalUserInput) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addLocalUser(input);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["localUsers"] });
+    },
+  });
+}
+
+export function useUpdateLocalUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      input,
+    }: { id: bigint; input: LocalUserInput }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.updateLocalUser(id, input);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["localUsers"] });
+    },
+  });
+}
+
+export function useDeleteLocalUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteLocalUser(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["localUsers"] });
     },
   });
 }

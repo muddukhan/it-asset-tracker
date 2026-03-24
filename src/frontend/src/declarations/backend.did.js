@@ -39,6 +39,7 @@ export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const AssetInput = IDL.Record({
   'id' : IDL.Opt(IDL.Nat),
   'status' : AssetStatus,
+  'employeeCode' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'serialNumber' : IDL.Text,
@@ -48,6 +49,13 @@ export const AssetInput = IDL.Record({
   'assignedUser' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
   'photoId' : IDL.Opt(ExternalBlob),
+});
+export const LocalUserInput = IDL.Record({
+  'employeeCode' : IDL.Text,
+  'name' : IDL.Text,
+  'email' : IDL.Text,
+  'notes' : IDL.Opt(IDL.Text),
+  'department' : IDL.Text,
 });
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
@@ -58,6 +66,7 @@ export const Time = IDL.Int;
 export const Asset = IDL.Record({
   'id' : IDL.Nat,
   'status' : AssetStatus,
+  'employeeCode' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'createdAt' : Time,
@@ -68,6 +77,14 @@ export const Asset = IDL.Record({
   'assignedUser' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
   'photoId' : IDL.Opt(ExternalBlob),
+});
+export const LocalUser = IDL.Record({
+  'id' : IDL.Nat,
+  'employeeCode' : IDL.Text,
+  'name' : IDL.Text,
+  'email' : IDL.Text,
+  'notes' : IDL.Opt(IDL.Text),
+  'department' : IDL.Text,
 });
 export const Principal = IDL.Principal;
 export const UserWithRole = IDL.Record({
@@ -128,10 +145,13 @@ export const idlService = IDL.Service({
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
+  'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
+  'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
   'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
+  'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
   'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
   'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
   'getAssetsByCategory' : IDL.Func(
@@ -156,6 +176,7 @@ export const idlService = IDL.Service({
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
   'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
+  'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
 });
 
 export const idlInitArgs = [];
@@ -192,6 +213,7 @@ export const idlFactory = ({ IDL }) => {
   const AssetInput = IDL.Record({
     'id' : IDL.Opt(IDL.Nat),
     'status' : AssetStatus,
+    'employeeCode' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'serialNumber' : IDL.Text,
@@ -201,6 +223,13 @@ export const idlFactory = ({ IDL }) => {
     'assignedUser' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
     'photoId' : IDL.Opt(ExternalBlob),
+  });
+  const LocalUserInput = IDL.Record({
+    'employeeCode' : IDL.Text,
+    'name' : IDL.Text,
+    'email' : IDL.Text,
+    'notes' : IDL.Opt(IDL.Text),
+    'department' : IDL.Text,
   });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
@@ -211,6 +240,7 @@ export const idlFactory = ({ IDL }) => {
   const Asset = IDL.Record({
     'id' : IDL.Nat,
     'status' : AssetStatus,
+    'employeeCode' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'createdAt' : Time,
@@ -221,6 +251,14 @@ export const idlFactory = ({ IDL }) => {
     'assignedUser' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
     'photoId' : IDL.Opt(ExternalBlob),
+  });
+  const LocalUser = IDL.Record({
+    'id' : IDL.Nat,
+    'employeeCode' : IDL.Text,
+    'name' : IDL.Text,
+    'email' : IDL.Text,
+    'notes' : IDL.Opt(IDL.Text),
+    'department' : IDL.Text,
   });
   const Principal = IDL.Principal;
   const UserWithRole = IDL.Record({
@@ -281,10 +319,13 @@ export const idlFactory = ({ IDL }) => {
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
+    'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
+    'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
     'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
+    'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
     'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
     'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
     'getAssetsByCategory' : IDL.Func(
@@ -309,6 +350,7 @@ export const idlFactory = ({ IDL }) => {
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
     'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
+    'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
   });
 };
 
