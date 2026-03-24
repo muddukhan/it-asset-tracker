@@ -43,6 +43,16 @@ export interface AssignmentHistoryEntry {
     assetName: string;
     fromAssignee?: string;
 }
+export interface StoreSoftwareInput {
+    id?: bigint;
+    purchaseDate?: string;
+    name: string;
+    licenseType?: string;
+    vendor: string;
+    notes?: string;
+    licenseKey?: string;
+    licenseExpiry?: string;
+}
 export interface LocalUser {
     id: bigint;
     employeeCode: string;
@@ -87,6 +97,17 @@ export interface Asset {
     location: string;
     photoId?: ExternalBlob;
 }
+export interface StoreSoftware {
+    id: bigint;
+    purchaseDate?: string;
+    name: string;
+    createdAt: Time;
+    licenseType?: string;
+    vendor: string;
+    notes?: string;
+    licenseKey?: string;
+    licenseExpiry?: string;
+}
 export interface UserProfile {
     name: string;
 }
@@ -114,12 +135,15 @@ export enum UserRole {
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
+    addSoftware(input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
     deleteLocalUser(id: bigint): Promise<void>;
+    deleteSoftware(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
+    getAllSoftware(): Promise<Array<StoreSoftware>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
     getAssetsByCategory(category: AssetCategory): Promise<Array<Asset>>;
@@ -129,12 +153,16 @@ export interface backendInterface {
     getCallerUserRole(): Promise<UserRole>;
     getHistory(): Promise<Array<AssignmentHistoryEntry>>;
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
+    getSoftware(id: bigint): Promise<StoreSoftware>;
+    getSoftwareByVendor(vendor: string): Promise<Array<StoreSoftware>>;
     getStats(): Promise<Stats>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
+    searchSoftware(term: string): Promise<Array<StoreSoftware>>;
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
+    updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
 }

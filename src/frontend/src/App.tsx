@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Monitor,
   Package,
   Settings,
   X,
@@ -32,6 +33,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { SoftwareInventoryPage } from "./pages/SoftwareInventoryPage";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +43,8 @@ type NavPage =
   | "assignments"
   | "history"
   | "reports"
-  | "admin";
+  | "admin"
+  | "software";
 
 type PageState = {
   page: NavPage;
@@ -58,6 +61,11 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
     id: "inventory",
     label: "Inventory",
     icon: <Package className="h-4 w-4" />,
+  },
+  {
+    id: "software",
+    label: "Software",
+    icon: <Monitor className="h-4 w-4" />,
   },
   {
     id: "assignments",
@@ -143,6 +151,12 @@ function AppShell() {
             onBack={previousPage === "dashboard" ? goBack : undefined}
           />
         );
+      case "software":
+        return (
+          <SoftwareInventoryPage
+            onBack={previousPage === "dashboard" ? goBack : undefined}
+          />
+        );
       default:
         return <DashboardPage onNavigate={navigate} />;
     }
@@ -184,7 +198,7 @@ function AppShell() {
 
         {/* Nav links (desktop) */}
         <nav className="hidden lg:flex items-center gap-1 flex-1">
-          {navItems.slice(0, 3).map((item) => (
+          {navItems.slice(0, 4).map((item) => (
             <button
               type="button"
               key={item.id}

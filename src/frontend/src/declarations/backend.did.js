@@ -57,6 +57,16 @@ export const LocalUserInput = IDL.Record({
   'notes' : IDL.Opt(IDL.Text),
   'department' : IDL.Text,
 });
+export const StoreSoftwareInput = IDL.Record({
+  'id' : IDL.Opt(IDL.Nat),
+  'purchaseDate' : IDL.Opt(IDL.Text),
+  'name' : IDL.Text,
+  'licenseType' : IDL.Opt(IDL.Text),
+  'vendor' : IDL.Text,
+  'notes' : IDL.Opt(IDL.Text),
+  'licenseKey' : IDL.Opt(IDL.Text),
+  'licenseExpiry' : IDL.Opt(IDL.Text),
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -85,6 +95,17 @@ export const LocalUser = IDL.Record({
   'email' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'department' : IDL.Text,
+});
+export const StoreSoftware = IDL.Record({
+  'id' : IDL.Nat,
+  'purchaseDate' : IDL.Opt(IDL.Text),
+  'name' : IDL.Text,
+  'createdAt' : Time,
+  'licenseType' : IDL.Opt(IDL.Text),
+  'vendor' : IDL.Text,
+  'notes' : IDL.Opt(IDL.Text),
+  'licenseKey' : IDL.Opt(IDL.Text),
+  'licenseExpiry' : IDL.Opt(IDL.Text),
 });
 export const Principal = IDL.Principal;
 export const UserWithRole = IDL.Record({
@@ -146,12 +167,15 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
   'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
+  'addSoftware' : IDL.Func([StoreSoftwareInput], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
   'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
+  'deleteSoftware' : IDL.Func([IDL.Nat], [], []),
   'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
   'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
+  'getAllSoftware' : IDL.Func([], [IDL.Vec(StoreSoftware)], ['query']),
   'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
   'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
   'getAssetsByCategory' : IDL.Func(
@@ -169,14 +193,22 @@ export const idlService = IDL.Service({
       [IDL.Vec(AssignmentHistoryEntry)],
       ['query'],
     ),
+  'getSoftware' : IDL.Func([IDL.Nat], [StoreSoftware], ['query']),
+  'getSoftwareByVendor' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(StoreSoftware)],
+      ['query'],
+    ),
   'getStats' : IDL.Func([], [Stats], ['query']),
   'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
   'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
+  'searchSoftware' : IDL.Func([IDL.Text], [IDL.Vec(StoreSoftware)], ['query']),
   'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
   'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
+  'updateSoftware' : IDL.Func([IDL.Nat, StoreSoftwareInput], [], []),
 });
 
 export const idlInitArgs = [];
@@ -231,6 +263,16 @@ export const idlFactory = ({ IDL }) => {
     'notes' : IDL.Opt(IDL.Text),
     'department' : IDL.Text,
   });
+  const StoreSoftwareInput = IDL.Record({
+    'id' : IDL.Opt(IDL.Nat),
+    'purchaseDate' : IDL.Opt(IDL.Text),
+    'name' : IDL.Text,
+    'licenseType' : IDL.Opt(IDL.Text),
+    'vendor' : IDL.Text,
+    'notes' : IDL.Opt(IDL.Text),
+    'licenseKey' : IDL.Opt(IDL.Text),
+    'licenseExpiry' : IDL.Opt(IDL.Text),
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
@@ -259,6 +301,17 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'department' : IDL.Text,
+  });
+  const StoreSoftware = IDL.Record({
+    'id' : IDL.Nat,
+    'purchaseDate' : IDL.Opt(IDL.Text),
+    'name' : IDL.Text,
+    'createdAt' : Time,
+    'licenseType' : IDL.Opt(IDL.Text),
+    'vendor' : IDL.Text,
+    'notes' : IDL.Opt(IDL.Text),
+    'licenseKey' : IDL.Opt(IDL.Text),
+    'licenseExpiry' : IDL.Opt(IDL.Text),
   });
   const Principal = IDL.Principal;
   const UserWithRole = IDL.Record({
@@ -320,12 +373,15 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
     'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
+    'addSoftware' : IDL.Func([StoreSoftwareInput], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
     'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
+    'deleteSoftware' : IDL.Func([IDL.Nat], [], []),
     'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
     'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
+    'getAllSoftware' : IDL.Func([], [IDL.Vec(StoreSoftware)], ['query']),
     'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
     'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
     'getAssetsByCategory' : IDL.Func(
@@ -343,14 +399,26 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(AssignmentHistoryEntry)],
         ['query'],
       ),
+    'getSoftware' : IDL.Func([IDL.Nat], [StoreSoftware], ['query']),
+    'getSoftwareByVendor' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(StoreSoftware)],
+        ['query'],
+      ),
     'getStats' : IDL.Func([], [Stats], ['query']),
     'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
     'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
+    'searchSoftware' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(StoreSoftware)],
+        ['query'],
+      ),
     'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
     'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
+    'updateSoftware' : IDL.Func([IDL.Nat, StoreSoftwareInput], [], []),
   });
 };
 

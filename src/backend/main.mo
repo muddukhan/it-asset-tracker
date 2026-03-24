@@ -10,13 +10,14 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
+import Migration "migration";
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-
+(with migration = Migration.run)
 actor {
   // Access control must be initialized first
   let accessControlState = AccessControl.initState();
@@ -127,8 +128,33 @@ actor {
     role : AccessControl.UserRole;
   };
 
-  // Store Types — StoreAsset must NOT change shape to preserve stable variable compatibility.
-  // employeeCode is stored separately in assetEmployeeCodes.
+  // Software Inventory Types
+  public type StoreSoftwareInput = {
+    id : ?Nat;
+    name : Text;
+    vendor : Text;
+    purchaseDate : ?Text;
+    licenseExpiry : ?Text;
+    licenseKey : ?Text;
+    licenseType : ?Text;
+    notes : ?Text;
+  };
+
+  public type StoreSoftware = {
+    id : Nat;
+    name : Text;
+    vendor : Text;
+    purchaseDate : ?Text;
+    licenseExpiry : ?Text;
+    licenseKey : ?Text;
+    licenseType : ?Text;
+    notes : ?Text;
+    createdAt : Time.Time;
+  };
+
+  // Store Types — Do NOT change shape to preserve compatibility with (de)serialization!
+  // StoreAsset must NOT change shape to preserve stable variable compatibility
+  // employeeCode is stored separately in assetEmployeeCodes
   public type StoreAsset = {
     id : Nat;
     name : Text;
@@ -181,18 +207,25 @@ actor {
     };
   };
 
-  // State
+  module StoreSoftware {
+    public func compare(a : StoreSoftware, b : StoreSoftware) : Order.Order {
+      Nat.compare(a.id, b.id);
+    };
+  };
+
+  // Global state (will be migrated from old backend)
   var nextAssetId = 1;
   var nextHistoryId = 1;
   var nextLocalUserId = 1;
+  var nextSoftwareId = 1;
 
   let assets = Map.empty<Nat, StoreAsset>();
   let history = Map.empty<Nat, StoreAssignmentHistoryEntry>();
   let initialized = Set.empty<Nat>();
   let userProfiles = Map.empty<Principal.Principal, StoreUserProfile>();
   let localUsers = Map.empty<Nat, StoreLocalUser>();
-  // Separate stable map for employee codes — added without touching StoreAsset
   let assetEmployeeCodes = Map.empty<Nat, Text>();
+  let softwareInventory = Map.empty<Nat, StoreSoftware>();
 
   // Helper: merge StoreAsset with its employee code into the public Asset type
   func toAsset(s : StoreAsset) : Asset {
@@ -225,16 +258,83 @@ actor {
     };
   };
 
+  func softwareInputToStore(input : ?Nat, software : StoreSoftwareInput, createdAt : Time.Time) : StoreSoftware {
+    {
+      id = switch (input) {
+        case (?id) { id };
+        case (null) { nextSoftwareId };
+      };
+      name = software.name;
+      vendor = software.vendor;
+      purchaseDate = software.purchaseDate;
+      licenseExpiry = software.licenseExpiry;
+      licenseKey = software.licenseKey;
+      licenseType = software.licenseType;
+      notes = software.notes;
+      createdAt;
+    };
+  };
+
+  func toSoftwareStore(s : StoreSoftware) : StoreSoftware {
+    {
+      id = s.id;
+      name = s.name;
+      vendor = s.vendor;
+      purchaseDate = s.purchaseDate;
+      licenseExpiry = s.licenseExpiry;
+      licenseKey = s.licenseKey;
+      licenseType = s.licenseType;
+      notes = s.notes;
+      createdAt = s.createdAt;
+    };
+  };
+
   // System functions
   system func preupgrade() {};
   system func postupgrade() {
     if (initialized.isEmpty()) {
       addSampleAssets();
+      addSampleSoftware();
       initialized.add(0);
     };
   };
 
-  // Sample data
+  func addSampleSoftware() {
+    let samples : [StoreSoftwareInput] = [
+      {
+        id = null;
+        name = "Microsoft Office 365";
+        vendor = "Microsoft";
+        purchaseDate = ?"2020-05-15";
+        licenseExpiry = ?"2023-05-15";
+        licenseKey = ?"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX";
+        licenseType = ?"Enterprise";
+        notes = ?"3-year subscription";
+      },
+      {
+        id = null;
+        name = "Adobe Creative Cloud";
+        vendor = "Adobe";
+        purchaseDate = ?"2021-08-03";
+        licenseExpiry = ?"2024-08-03";
+        licenseKey = ?"YYYYY-YYYYY-YYYYY-YYYYY-YYYYY";
+        licenseType = ?"Annual";
+        notes = null;
+      },
+      {
+        id = null;
+        name = "Slack";
+        vendor = "Slack Technologies";
+        purchaseDate = ?"2022-02-11";
+        licenseExpiry = ?"2023-02-11";
+        licenseKey = ?"ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ";
+        licenseType = ?"Business Plan";
+        notes = ?"Used by entire company";
+      }
+    ];
+    samples.forEach(func(input) { ignore addSoftwareInternal(input) });
+  };
+
   func addSampleAssets() {
     let samples : [AssetInput] = [
       {
@@ -382,6 +482,15 @@ actor {
       case (?code) { assetEmployeeCodes.add(id, code) };
     };
 
+    id;
+  };
+
+  // Internal Add Software
+  func addSoftwareInternal(input : StoreSoftwareInput) : Nat {
+    let id = nextSoftwareId;
+    nextSoftwareId += 1;
+    let software : StoreSoftware = softwareInputToStore(input.id, input, Time.now());
+    softwareInventory.add(id, software);
     id;
   };
 
@@ -668,5 +777,74 @@ actor {
       expired = 0;
       active = total;
     };
+  };
+
+  // Software Inventory CRUD
+
+  public shared ({ caller }) func addSoftware(input : StoreSoftwareInput) : async Nat {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can add software");
+    };
+    addSoftwareInternal(input);
+  };
+
+  public shared ({ caller }) func updateSoftware(id : Nat, input : StoreSoftwareInput) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can update software");
+    };
+    switch (softwareInventory.get(id)) {
+      case (null) { Runtime.trap("Software not found") };
+      case (?existing) {
+        let updated = softwareInputToStore(?id, input, existing.createdAt);
+        softwareInventory.add(id, updated);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteSoftware(id : Nat) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can delete software");
+    };
+    softwareInventory.remove(id);
+  };
+
+  public query ({ caller }) func getAllSoftware() : async [StoreSoftware] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can fetch software");
+    };
+    softwareInventory.values().toArray().sort();
+  };
+
+  public query ({ caller }) func getSoftware(id : Nat) : async StoreSoftware {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can fetch software");
+    };
+    switch (softwareInventory.get(id)) {
+      case (null) { Runtime.trap("Software not found") };
+      case (?software) { toSoftwareStore(software) };
+    };
+  };
+
+  public query ({ caller }) func getSoftwareByVendor(vendor : Text) : async [StoreSoftware] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can fetch software");
+    };
+    softwareInventory.values().toArray().filter(
+      func(software) {
+        software.vendor.toLower().contains(#text(vendor.toLower()));
+      }
+    ).sort();
+  };
+
+  public query ({ caller }) func searchSoftware(term : Text) : async [StoreSoftware] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can fetch software");
+    };
+    let lowerTerm = term.toLower();
+    softwareInventory.values().toArray().filter(
+      func(software) {
+        software.name.toLower().contains(#text(lowerTerm)) or software.vendor.toLower().contains(#text(lowerTerm));
+      }
+    ).sort();
   };
 };
