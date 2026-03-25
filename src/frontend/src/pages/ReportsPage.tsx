@@ -8,12 +8,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, BarChart3, Download, Package, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
+  CheckCircle,
+  Download,
+  Package,
+  ShieldAlert,
+  Wrench,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
-import type { Asset } from "../backend";
+import type { Asset, StoreSoftware } from "../backend";
 import { useGetAllAssets, useGetStats } from "../hooks/useQueries";
+import { useGetAllSoftware } from "../hooks/useSoftwareQueries";
 
 const STAT_SKELETONS = ["r1", "r2", "r3", "r4"] as const;
 
@@ -65,16 +75,53 @@ function StatCard({
   );
 }
 
-function exportCSV(assets: Asset[]) {
+function buildCSV(headers: string[], rows: string[][]): string {
+  const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  return [headers.map(csvEscape), ...rows.map((r) => r.map(csvEscape))]
+    .map((r) => r.join(","))
+    .join("\n");
+}
+
+function downloadCSV(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function getWarrantyStatus(
+  warrantyDate?: string | null,
+): "Active" | "Expiring Soon" | "Expired" | "N/A" {
+  if (!warrantyDate) return "N/A";
+  const expiry = new Date(warrantyDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (expiry < today) return "Expired";
+  const in30 = new Date(today);
+  in30.setDate(in30.getDate() + 30);
+  if (expiry <= in30) return "Expiring Soon";
+  return "Active";
+}
+
+function exportHardwareCSV(assets: Asset[]) {
   const headers = [
     "ID",
     "Name",
     "Category",
     "Serial Number",
     "Assigned User",
+    "Employee Code",
     "Location",
     "Status",
     "Purchase Date",
+    "Warranty Date",
+    "Warranty Status",
+    "Processor",
+    "RAM",
+    "Storage",
     "Notes",
   ];
   const rows = assets.map((a) => [
@@ -83,28 +130,78 @@ function exportCSV(assets: Asset[]) {
     a.category,
     a.serialNumber,
     a.assignedUser ?? "",
+    (a.employeeCode as string | undefined) ?? "",
     a.location,
     a.status,
     a.purchaseDate ?? "",
+    (a.warrantyDate as string | undefined) ?? "",
+    getWarrantyStatus(a.warrantyDate as string | null | undefined),
+    (a.processorType as string | undefined) ?? "",
+    (a.ram as string | undefined) ?? "",
+    (a.storage as string | undefined) ?? "",
     a.notes ?? "",
   ]);
+  downloadCSV(
+    buildCSV(headers, rows),
+    `hardware-assets-${new Date().toISOString().slice(0, 10)}.csv`,
+  );
+}
 
-  const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const csv = [headers.map(csvEscape), ...rows.map((r) => r.map(csvEscape))]
-    .map((r) => r.join(","))
-    .join("\n");
+function getSoftwareLicenseStatus(
+  licenseExpiry?: string | null,
+): "active" | "expiring" | "expired" {
+  if (!licenseExpiry) return "active";
+  const expiry = new Date(licenseExpiry);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (expiry < today) return "expired";
+  const in30 = new Date(today);
+  in30.setDate(in30.getDate() + 30);
+  if (expiry <= in30) return "expiring";
+  return "active";
+}
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `it-assets-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+const LICENSE_STATUS_LABEL: Record<"active" | "expiring" | "expired", string> =
+  {
+    active: "Active",
+    expiring: "Expiring Soon",
+    expired: "Expired",
+  };
+
+function exportSoftwareCSV(software: StoreSoftware[]) {
+  const headers = [
+    "ID",
+    "Name",
+    "Vendor",
+    "Purchase Date",
+    "License Expiry",
+    "License Status",
+    "License Type",
+    "License Key",
+    "Notes",
+  ];
+  const rows = software.map((s) => [
+    String(s.id),
+    s.name,
+    s.vendor,
+    s.purchaseDate ?? "",
+    s.licenseExpiry ?? "",
+    LICENSE_STATUS_LABEL[
+      getSoftwareLicenseStatus(s.licenseExpiry as string | null | undefined)
+    ],
+    s.licenseType ?? "",
+    s.licenseKey ?? "",
+    s.notes ?? "",
+  ]);
+  downloadCSV(
+    buildCSV(headers, rows),
+    `software-assets-${new Date().toISOString().slice(0, 10)}.csv`,
+  );
 }
 
 export function ReportsPage({ onBack }: { onBack?: () => void }) {
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
+  const { data: software, isLoading: softwareLoading } = useGetAllSoftware();
   const { data: stats, isLoading: statsLoading } = useGetStats();
 
   const categoryBreakdown = useMemo(() => {
@@ -125,13 +222,59 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
       .sort((a, b) => b.total - a.total);
   }, [assets]);
 
-  const handleExport = () => {
+  const softwareStats = useMemo(() => {
+    if (!software) return { total: 0, active: 0, expiring: 0, expired: 0 };
+    let active = 0;
+    let expiring = 0;
+    let expired = 0;
+    for (const s of software) {
+      const status = getSoftwareLicenseStatus(
+        s.licenseExpiry as string | null | undefined,
+      );
+      if (status === "active") active++;
+      else if (status === "expiring") expiring++;
+      else expired++;
+    }
+    return { total: software.length, active, expiring, expired };
+  }, [software]);
+
+  const softwareLicenseTypeBreakdown = useMemo(() => {
+    if (!software) return [];
+    const map: Record<
+      string,
+      { total: number; active: number; expiring: number; expired: number }
+    > = {};
+    for (const s of software) {
+      const key = (s.licenseType as string | null | undefined) || "Unspecified";
+      if (!map[key])
+        map[key] = { total: 0, active: 0, expiring: 0, expired: 0 };
+      map[key].total++;
+      const status = getSoftwareLicenseStatus(
+        s.licenseExpiry as string | null | undefined,
+      );
+      map[key][status]++;
+    }
+    return Object.entries(map)
+      .map(([type, c]) => ({ type, ...c }))
+      .sort((a, b) => b.total - a.total);
+  }, [software]);
+
+  const handleHardwareExport = () => {
     if (!assets || assets.length === 0) {
-      toast.error("No assets to export");
+      toast.error("No hardware assets to export");
       return;
     }
-    exportCSV(assets);
-    toast.success(`Exported ${assets.length} assets to CSV`);
+    exportHardwareCSV(assets);
+    toast.success(`Exported ${assets.length} hardware assets to CSV`);
+  };
+
+  const handleSoftwareExport = () => {
+    if (!software || software.length === 0) {
+      toast.error("No software assets to export");
+      return;
+    }
+    exportSoftwareCSV(software);
+    toast.success(`Exported ${software.length} software assets to CSV`);
   };
 
   return (
@@ -164,55 +307,122 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
             Asset analytics and data export
           </p>
         </div>
-        <Button
-          onClick={handleExport}
-          disabled={assetsLoading || !assets}
-          style={{ backgroundColor: "oklch(var(--primary))", color: "white" }}
-          data-ocid="reports.primary_button"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={handleHardwareExport}
+            disabled={assetsLoading || !assets}
+            style={{ backgroundColor: "oklch(var(--primary))", color: "white" }}
+            data-ocid="reports.primary_button"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Hardware CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleSoftwareExport}
+            disabled={softwareLoading || !software}
+            data-ocid="reports.secondary_button"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Software CSV
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsLoading ? (
-          STAT_SKELETONS.map((k) => (
-            <Skeleton key={k} className="h-24 rounded-xl" />
-          ))
-        ) : (
-          <>
-            <StatCard
-              label="Total Assets"
-              value={stats ? Number(stats.total) : 0}
-              icon={<Package className="h-5 w-5" />}
-              color="oklch(var(--primary))"
-              index={0}
-            />
-            <StatCard
-              label="Assigned"
-              value={stats ? Number(stats.assigned) : 0}
-              icon={<BarChart3 className="h-5 w-5" />}
-              color="oklch(var(--status-assigned-text))"
-              index={1}
-            />
-            <StatCard
-              label="In Repair"
-              value={stats ? Number(stats.inRepair) : 0}
-              icon={<Wrench className="h-5 w-5" />}
-              color="oklch(var(--status-inrepair-text))"
-              index={2}
-            />
-            <StatCard
-              label="Available"
-              value={stats ? Number(stats.available) : 0}
-              icon={<Package className="h-5 w-5" />}
-              color="oklch(var(--status-available-text))"
-              index={3}
-            />
-          </>
-        )}
+      {/* Hardware Stats */}
+      <div>
+        <h2
+          className="text-sm font-semibold uppercase tracking-wide mb-3"
+          style={{ color: "oklch(var(--muted-foreground))" }}
+        >
+          Hardware Overview
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statsLoading ? (
+            STAT_SKELETONS.map((k) => (
+              <Skeleton key={k} className="h-24 rounded-xl" />
+            ))
+          ) : (
+            <>
+              <StatCard
+                label="Total Assets"
+                value={stats ? Number(stats.total) : 0}
+                icon={<Package className="h-5 w-5" />}
+                color="oklch(var(--primary))"
+                index={0}
+              />
+              <StatCard
+                label="Assigned"
+                value={stats ? Number(stats.assigned) : 0}
+                icon={<BarChart3 className="h-5 w-5" />}
+                color="oklch(var(--status-assigned-text))"
+                index={1}
+              />
+              <StatCard
+                label="In Repair"
+                value={stats ? Number(stats.inRepair) : 0}
+                icon={<Wrench className="h-5 w-5" />}
+                color="oklch(var(--status-inrepair-text))"
+                index={2}
+              />
+              <StatCard
+                label="Available"
+                value={stats ? Number(stats.available) : 0}
+                icon={<Package className="h-5 w-5" />}
+                color="oklch(var(--status-available-text))"
+                index={3}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Software Summary */}
+      <div>
+        <h2
+          className="text-sm font-semibold uppercase tracking-wide mb-3"
+          style={{ color: "oklch(var(--muted-foreground))" }}
+        >
+          Software Summary
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {softwareLoading ? (
+            STAT_SKELETONS.map((k) => (
+              <Skeleton key={k} className="h-24 rounded-xl" />
+            ))
+          ) : (
+            <>
+              <StatCard
+                label="Total Software"
+                value={softwareStats.total}
+                icon={<Package className="h-5 w-5" />}
+                color="oklch(var(--primary))"
+                index={0}
+              />
+              <StatCard
+                label="Active Licenses"
+                value={softwareStats.active}
+                icon={<CheckCircle className="h-5 w-5" />}
+                color="#22c55e"
+                index={1}
+              />
+              <StatCard
+                label="Expiring Soon"
+                value={softwareStats.expiring}
+                icon={<AlertTriangle className="h-5 w-5" />}
+                color="#f59e0b"
+                index={2}
+              />
+              <StatCard
+                label="Expired"
+                value={softwareStats.expired}
+                icon={<ShieldAlert className="h-5 w-5" />}
+                color="#ef4444"
+                index={3}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* Category breakdown */}
@@ -331,6 +541,148 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
                     </TableRow>
                   );
                 })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Software by License Type */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.35 }}
+        className="rounded-xl border shadow-card overflow-hidden"
+        style={{
+          backgroundColor: "oklch(var(--card))",
+          borderColor: "oklch(var(--border))",
+        }}
+      >
+        <div
+          className="px-5 py-4 border-b"
+          style={{ borderColor: "oklch(var(--border))" }}
+        >
+          <h2 className="font-semibold text-base text-foreground">
+            Software by License Type
+          </h2>
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: "oklch(var(--muted-foreground))" }}
+          >
+            License status breakdown across software categories
+          </p>
+        </div>
+
+        {softwareLoading ? (
+          <div className="p-5 space-y-3" data-ocid="reports.loading_state">
+            {["s1", "s2", "s3"].map((k) => (
+              <Skeleton key={k} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : softwareLicenseTypeBreakdown.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 gap-2"
+            data-ocid="reports.empty_state"
+          >
+            <Package
+              className="h-8 w-8"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            />
+            <p
+              className="text-sm"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            >
+              No software data yet
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow
+                  style={{ backgroundColor: "oklch(var(--muted) / 0.5)" }}
+                >
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    License Type
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
+                    Count
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
+                    Expired
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
+                    Expiring Soon
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
+                    Active
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {softwareLicenseTypeBreakdown.map((row, i) => (
+                  <TableRow
+                    key={row.type}
+                    className="hover:bg-muted/30"
+                    data-ocid={`reports.item.${i + 1}`}
+                  >
+                    <TableCell className="font-medium">{row.type}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {row.total}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {row.expired > 0 ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: "#ef444420",
+                            color: "#ef4444",
+                          }}
+                        >
+                          {row.expired}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground font-mono">
+                          0
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {row.expiring > 0 ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: "#f59e0b20",
+                            color: "#f59e0b",
+                          }}
+                        >
+                          {row.expiring}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground font-mono">
+                          0
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {row.active > 0 ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: "#22c55e20",
+                            color: "#22c55e",
+                          }}
+                        >
+                          {row.active}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground font-mono">
+                          0
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
