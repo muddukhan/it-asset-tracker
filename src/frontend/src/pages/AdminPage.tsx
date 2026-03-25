@@ -36,7 +36,29 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend";
-import type { LocalUser, LocalUserInput, UserWithRole } from "../backend";
+import type { UserWithRole } from "../backend";
+
+interface LocalUser {
+  id: bigint;
+  name: string;
+  username: string;
+  accessLevel: string;
+  employeeCode: string;
+  email: string;
+  notes?: string;
+  department: string;
+}
+
+interface LocalUserInput {
+  name: string;
+  username: string;
+  password: string;
+  accessLevel: string;
+  employeeCode: string;
+  email: string;
+  notes?: string;
+  department: string;
+}
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddLocalUser,
@@ -68,6 +90,28 @@ function roleBadge(role: UserRole) {
   return (
     <Badge className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100">
       View Only
+    </Badge>
+  );
+}
+
+function accessLevelBadge(level: string) {
+  if (level === "admin") {
+    return (
+      <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">
+        Admin
+      </Badge>
+    );
+  }
+  if (level === "readwrite") {
+    return (
+      <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+        Read &amp; Write
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100">
+      Read Only
     </Badge>
   );
 }
@@ -175,6 +219,9 @@ function UserRoleRow({
 
 const emptyLocalUserForm = (): LocalUserInput => ({
   name: "",
+  username: "",
+  password: "",
+  accessLevel: "readonly",
   employeeCode: "",
   department: "",
   email: "",
@@ -194,6 +241,9 @@ function LocalUserRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState<LocalUserInput>({
     name: user.name,
+    username: user.username,
+    password: "",
+    accessLevel: user.accessLevel,
     employeeCode: user.employeeCode,
     department: user.department,
     email: user.email,
@@ -205,8 +255,12 @@ function LocalUserRow({
       toast.error("Name is required");
       return;
     }
+    if (!form.username.trim()) {
+      toast.error("Username is required");
+      return;
+    }
     try {
-      await updateMutation.mutateAsync({ id: user.id, input: form });
+      await (updateMutation as any).mutateAsync({ id: user.id, input: form });
       toast.success("User updated");
       setEditing(false);
     } catch {
@@ -226,7 +280,7 @@ function LocalUserRow({
   if (editing) {
     return (
       <TableRow data-ocid={`localusers.item.${index}`}>
-        <TableCell colSpan={5}>
+        <TableCell colSpan={7}>
           <div className="flex flex-col gap-3 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
@@ -239,6 +293,51 @@ function LocalUserRow({
                   }
                   data-ocid="localusers.input"
                 />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Username *</Label>
+                <Input
+                  className="h-8 text-sm"
+                  value={form.username}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, username: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">New Password</Label>
+                <Input
+                  className="h-8 text-sm"
+                  type="password"
+                  placeholder="Leave blank to keep current"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, password: e.target.value }))
+                  }
+                  data-ocid="localusers.input"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Access Level</Label>
+                <Select
+                  value={form.accessLevel}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, accessLevel: v }))
+                  }
+                >
+                  <SelectTrigger
+                    className="h-8 text-sm"
+                    data-ocid="localusers.select"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin / Full Access</SelectItem>
+                    <SelectItem value="readwrite">Read &amp; Write</SelectItem>
+                    <SelectItem value="readonly">Read Only</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">User ID</Label>
@@ -322,6 +421,10 @@ function LocalUserRow({
   return (
     <TableRow data-ocid={`localusers.item.${index}`}>
       <TableCell className="font-medium text-sm">{user.name}</TableCell>
+      <TableCell className="text-sm font-mono">{user.username}</TableCell>
+      <TableCell className="text-sm">
+        {accessLevelBadge(user.accessLevel)}
+      </TableCell>
       <TableCell className="text-sm font-mono">{user.employeeCode}</TableCell>
       <TableCell className="text-sm text-muted-foreground">
         {user.department || "—"}
@@ -395,8 +498,16 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
       toast.error("Name is required");
       return;
     }
+    if (!form.username.trim()) {
+      toast.error("Username is required");
+      return;
+    }
+    if (!form.password.trim()) {
+      toast.error("Password is required");
+      return;
+    }
     try {
-      await addMutation.mutateAsync(form);
+      await (addMutation as any).mutateAsync(form);
       toast.success("User added successfully");
       onClose();
     } catch {
@@ -430,6 +541,50 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
               data-ocid="localusers.input"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Username *</Label>
+            <Input
+              className="h-9 text-sm"
+              placeholder="e.g. admin"
+              value={form.username}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, username: e.target.value }))
+              }
+              data-ocid="localusers.input"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Password *</Label>
+            <Input
+              className="h-9 text-sm"
+              type="password"
+              placeholder="Set a password"
+              value={form.password}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, password: e.target.value }))
+              }
+              data-ocid="localusers.input"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Access Level *</Label>
+            <Select
+              value={form.accessLevel}
+              onValueChange={(v) => setForm((p) => ({ ...p, accessLevel: v }))}
+            >
+              <SelectTrigger
+                className="h-9 text-sm"
+                data-ocid="localusers.select"
+              >
+                <SelectValue placeholder="Select access" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin / Full Access</SelectItem>
+                <SelectItem value="readwrite">Read &amp; Write</SelectItem>
+                <SelectItem value="readonly">Read Only</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs">User ID</Label>
@@ -1059,22 +1214,30 @@ export function AdminPage({ onBack }: { onBack?: () => void }) {
             </p>
           </div>
         ) : (
-          <Table data-ocid="localusers.table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>User ID</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {localUsers.map((u, i) => (
-                <LocalUserRow key={u.id.toString()} user={u} index={i + 1} />
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <Table data-ocid="localusers.table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>User ID</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {localUsers.map((u, i) => (
+                  <LocalUserRow
+                    key={u.id.toString()}
+                    user={u as unknown as LocalUser}
+                    index={i + 1}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </motion.div>
     </div>

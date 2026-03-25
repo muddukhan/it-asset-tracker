@@ -51,6 +51,21 @@ type PageState = {
   filter?: string;
 };
 
+export interface LocalSession {
+  name: string;
+  accessLevel: string;
+}
+
+function loadLocalSession(): LocalSession | null {
+  try {
+    const raw = localStorage.getItem("localUserSession");
+    if (!raw) return null;
+    return JSON.parse(raw) as LocalSession;
+  } catch {
+    return null;
+  }
+}
+
 const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
   {
     id: "dashboard",
@@ -79,9 +94,17 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
 
 function AppShell() {
   const { identity, clear, isInitializing } = useInternetIdentity();
+  const [localSession, setLocalSession] = useState<LocalSession | null>(
+    loadLocalSession,
+  );
   const [pageState, setPageState] = useState<PageState>({ page: "dashboard" });
   const [previousPage, setPreviousPage] = useState<NavPage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleLocalLogout = () => {
+    localStorage.removeItem("localUserSession");
+    setLocalSession(null);
+  };
 
   const navigate = (page: string, filter?: string) => {
     setPreviousPage(pageState.page);
@@ -112,12 +135,18 @@ function AppShell() {
     );
   }
 
-  if (!identity) {
-    return <LoginPage />;
+  if (!identity && !localSession) {
+    return <LoginPage onLocalLogin={(session) => setLocalSession(session)} />;
   }
 
-  const principal = identity.getPrincipal().toString();
-  const initials = principal.slice(0, 2).toUpperCase();
+  // Determine display name and initials
+  const isLocalUser = !identity && !!localSession;
+  const displayName = isLocalUser
+    ? localSession!.name
+    : identity!.getPrincipal().toString();
+  const initials = isLocalUser
+    ? localSession!.name.slice(0, 2).toUpperCase()
+    : identity!.getPrincipal().toString().slice(0, 2).toUpperCase();
 
   function renderPage() {
     switch (pageState.page) {
@@ -243,7 +272,7 @@ function AppShell() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-sm font-medium hidden md:block">
-                  {principal.slice(0, 8)}…
+                  {isLocalUser ? displayName : `${displayName.slice(0, 8)}…`}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -251,14 +280,24 @@ function AppShell() {
             <DropdownMenuContent align="end" className="w-52">
               <div className="px-3 py-2 border-b">
                 <p className="text-xs font-medium text-foreground">
-                  Signed in as
+                  {isLocalUser ? "Local User" : "Signed in as"}
                 </p>
                 <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {principal}
+                  {isLocalUser ? displayName : displayName}
                 </p>
+                {isLocalUser && localSession && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Access:{" "}
+                    {localSession.accessLevel === "admin"
+                      ? "Admin"
+                      : localSession.accessLevel === "readwrite"
+                        ? "Read & Write"
+                        : "Read Only"}
+                  </p>
+                )}
               </div>
               <DropdownMenuItem
-                onClick={clear}
+                onClick={isLocalUser ? handleLocalLogout : clear}
                 className="text-destructive focus:text-destructive cursor-pointer mt-1"
                 data-ocid="nav.logout.button"
               >

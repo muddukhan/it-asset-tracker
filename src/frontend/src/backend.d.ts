@@ -55,18 +55,28 @@ export interface StoreSoftwareInput {
 }
 export interface LocalUser {
     id: bigint;
-    employeeCode: string;
     name: string;
+    username: string;
+    accessLevel: string;
+    employeeCode: string;
     email: string;
     notes?: string;
     department: string;
 }
 export interface LocalUserInput {
-    employeeCode: string;
     name: string;
+    username: string;
+    password: string;
+    accessLevel: string;
+    employeeCode: string;
     email: string;
     notes?: string;
     department: string;
+}
+export interface LocalLoginResult {
+    id: bigint;
+    name: string;
+    accessLevel: string;
 }
 export interface AssetInput {
     id?: bigint;
@@ -165,6 +175,7 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
     isCallerAdmin(): Promise<boolean>;
+    loginLocalUser(username: string, password: string): Promise<LocalLoginResult | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
     searchSoftware(term: string): Promise<Array<StoreSoftware>>;

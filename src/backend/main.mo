@@ -10,14 +10,14 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
-import Migration "migration";
+
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-(with migration = Migration.run)
+
 actor {
   // Access control must be initialized first
   let accessControlState = AccessControl.initState();
@@ -47,6 +47,8 @@ actor {
   public type LocalUser = {
     id : Nat;
     name : Text;
+    username : Text;
+    accessLevel : Text;
     employeeCode : Text;
     department : Text;
     email : Text;
@@ -55,6 +57,9 @@ actor {
 
   public type LocalUserInput = {
     name : Text;
+    username : Text;
+    password : Text;
+    accessLevel : Text;
     employeeCode : Text;
     department : Text;
     email : Text;
@@ -203,6 +208,13 @@ actor {
     notes : ?Text;
   };
 
+  // Separate stable type for credentials - stored in a separate map to preserve StoreLocalUser compatibility
+  public type StoreLocalUserCredentials = {
+    username : Text;
+    password : Text;
+    accessLevel : Text;
+  };
+
   module AssignmentHistoryEntry {
     public func compare(a : AssignmentHistoryEntry, b : AssignmentHistoryEntry) : Order.Order {
       Int.compare(b.timestamp, a.timestamp);
@@ -232,6 +244,7 @@ actor {
   let initialized = Set.empty<Nat>();
   let userProfiles = Map.empty<Principal.Principal, StoreUserProfile>();
   let localUsers = Map.empty<Nat, StoreLocalUser>();
+  let localUserCredentials = Map.empty<Nat, StoreLocalUserCredentials>();
   let assetEmployeeCodes = Map.empty<Nat, Text>();
   let softwareInventory = Map.empty<Nat, StoreSoftware>();
 
@@ -259,9 +272,12 @@ actor {
 
   // Helper converter for LocalUser
   func toLocalUser(storeUser : StoreLocalUser) : LocalUser {
+    let creds = localUserCredentials.get(storeUser.id);
     {
       id = storeUser.id;
       name = storeUser.name;
+      username = switch (creds) { case (?c) { c.username }; case (null) { "" } };
+      accessLevel = switch (creds) { case (?c) { c.accessLevel }; case (null) { "readonly" } };
       employeeCode = storeUser.employeeCode;
       department = storeUser.department;
       email = storeUser.email;
@@ -549,8 +565,14 @@ actor {
       email = input.email;
       notes = input.notes;
     };
+    let creds : StoreLocalUserCredentials = {
+      username = input.username;
+      password = input.password;
+      accessLevel = input.accessLevel;
+    };
 
     localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
     id;
   };
 
@@ -570,7 +592,15 @@ actor {
           email = input.email;
           notes = input.notes;
         };
+        let updatedCreds : StoreLocalUserCredentials = {
+          username = input.username;
+          password = if (input.password == "") {
+            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } }
+          } else { input.password };
+          accessLevel = input.accessLevel;
+        };
         localUsers.add(id, updated);
+        localUserCredentials.add(id, updatedCreds);
       };
     };
   };
@@ -583,6 +613,7 @@ actor {
       Runtime.trap("Local user not found");
     };
     localUsers.remove(id);
+    localUserCredentials.remove(id);
   };
 
   public query ({ caller }) func getAllLocalUsers() : async [LocalUser] {
@@ -590,6 +621,27 @@ actor {
       Runtime.trap("Unauthorized: Only users can fetch local users");
     };
     localUsers.values().map(toLocalUser).toArray();
+  };
+
+
+  // Login local user by username and password - public, no auth required
+  public query func loginLocalUser(username : Text, password : Text) : async ?{ id : Nat; name : Text; accessLevel : Text } {
+    var result : ?{ id : Nat; name : Text; accessLevel : Text } = null;
+    for ((id, creds) in localUserCredentials.entries()) {
+      if (creds.username == username and creds.password == password) {
+        switch (localUsers.get(id)) {
+          case (?user) {
+            result := ?{
+              id = user.id;
+              name = user.name;
+              accessLevel = creds.accessLevel;
+            };
+          };
+          case (null) {};
+        };
+      };
+    };
+    result;
   };
 
   // Bootstrap admin - allows first user to become admin with no existing admins
