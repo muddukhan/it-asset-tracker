@@ -56,6 +56,7 @@ const SKELETON_ROWS = ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6"] as const;
 type Props = {
   initialStatusFilter?: string;
   initialCategoryFilter?: string;
+  initialAgeFilter?: string;
   onBack?: () => void;
 };
 
@@ -91,6 +92,7 @@ function WarrantyBadge({ warrantyDate }: { warrantyDate?: string }) {
 export function InventoryPage({
   initialStatusFilter,
   initialCategoryFilter,
+  initialAgeFilter,
   onBack,
 }: Props) {
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
@@ -104,6 +106,7 @@ export function InventoryPage({
   const [categoryFilter, setCategoryFilter] = useState<string>(
     initialCategoryFilter ?? "all",
   );
+  const [ageFilter, setAgeFilter] = useState<string>(initialAgeFilter ?? "all");
   const [page, setPage] = useState(1);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editAsset, setEditAsset] = useState<Asset | null>(null);
@@ -125,9 +128,26 @@ export function InventoryPage({
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       const matchCategory =
         categoryFilter === "all" || a.category === categoryFilter;
-      return matchSearch && matchStatus && matchCategory;
+      const matchAge = (() => {
+        if (ageFilter === "all") return true;
+        const pd = Array.isArray(a.purchaseDate)
+          ? a.purchaseDate[0]
+          : (a.purchaseDate as string | undefined);
+        if (!pd) return ageFilter === "unknown";
+        const ageYears =
+          (Date.now() - new Date(pd).getTime()) /
+          (1000 * 60 * 60 * 24 * 365.25);
+        if (ageFilter === "lt1") return ageYears < 1;
+        if (ageFilter === "1to2") return ageYears >= 1 && ageYears < 2;
+        if (ageFilter === "2to3") return ageYears >= 2 && ageYears < 3;
+        if (ageFilter === "3to5") return ageYears >= 3 && ageYears < 5;
+        if (ageFilter === "gt5") return ageYears >= 5;
+        if (ageFilter === "unknown") return !pd;
+        return true;
+      })();
+      return matchSearch && matchStatus && matchCategory && matchAge;
     });
-  }, [assets, searchTerm, statusFilter, categoryFilter]);
+  }, [assets, searchTerm, statusFilter, categoryFilter, ageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -229,12 +249,33 @@ export function InventoryPage({
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={ageFilter}
+              onValueChange={(v) => {
+                setAgeFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-40" data-ocid="inventory.select">
+                <SelectValue placeholder="Purchase Age" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Ages</SelectItem>
+                <SelectItem value="lt1">Under 1 Year</SelectItem>
+                <SelectItem value="1to2">1–2 Years</SelectItem>
+                <SelectItem value="2to3">2–3 Years</SelectItem>
+                <SelectItem value="3to5">3–5 Years</SelectItem>
+                <SelectItem value="gt5">5+ Years</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               onClick={() => {
                 setSearchTerm("");
                 setStatusFilter("all");
                 setCategoryFilter("all");
+                setAgeFilter("all");
                 setPage(1);
               }}
               data-ocid="inventory.secondary_button"

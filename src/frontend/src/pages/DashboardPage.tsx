@@ -37,6 +37,12 @@ const categoryIcons: Record<AssetCategory, React.ReactNode> = {
   [AssetCategory.other]: <HardDrive className="h-5 w-5" />,
 };
 
+type AgeBucket = {
+  key: string;
+  label: string;
+  count: number;
+};
+
 function StatCard({
   label,
   value,
@@ -132,6 +138,42 @@ export function DashboardPage({ onNavigate }: Props) {
       .filter((a) => a.processorType || a.ram || a.storage)
       .slice(0, 5);
   }, [assets]);
+
+  const laptopAgeBuckets = useMemo((): AgeBucket[] => {
+    if (!assets) return [];
+    const laptops = assets.filter((a) => a.category === AssetCategory.laptop);
+    const buckets: AgeBucket[] = [
+      { key: "lt1", label: "Under 1 Year", count: 0 },
+      { key: "1to2", label: "1–2 Years", count: 0 },
+      { key: "2to3", label: "2–3 Years", count: 0 },
+      { key: "3to5", label: "3–5 Years", count: 0 },
+      { key: "gt5", label: "5+ Years", count: 0 },
+      { key: "unknown", label: "Unknown", count: 0 },
+    ];
+    for (const a of laptops) {
+      const pd = Array.isArray(a.purchaseDate)
+        ? a.purchaseDate[0]
+        : (a.purchaseDate as string | undefined);
+      if (!pd) {
+        buckets[5].count++;
+        continue;
+      }
+      const ageYears =
+        (Date.now() - new Date(pd).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      if (ageYears < 1) buckets[0].count++;
+      else if (ageYears < 2) buckets[1].count++;
+      else if (ageYears < 3) buckets[2].count++;
+      else if (ageYears < 5) buckets[3].count++;
+      else buckets[4].count++;
+    }
+    return buckets;
+  }, [assets]);
+
+  const totalLaptops = useMemo(
+    () => laptopAgeBuckets.reduce((s, b) => s + b.count, 0),
+    [laptopAgeBuckets],
+  );
+  const maxBucketCount = Math.max(...laptopAgeBuckets.map((b) => b.count), 1);
 
   const maxCategoryCount = Math.max(
     ...categoryBreakdown.map((c) => c.count),
@@ -464,6 +506,83 @@ export function DashboardPage({ onNavigate }: Props) {
               );
             })}
           </ul>
+        )}
+      </motion.div>
+
+      {/* Laptop Age Distribution panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.36, duration: 0.35 }}
+        className="rounded-xl border shadow-card bg-card overflow-hidden"
+      >
+        <div className="px-5 py-4 border-b flex items-center gap-2">
+          <Laptop className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-semibold text-base text-foreground">
+            Laptop Age Distribution
+          </h2>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {totalLaptops} laptop{totalLaptops !== 1 ? "s" : ""} total
+          </span>
+        </div>
+        {assetsLoading ? (
+          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+            {["a1", "a2", "a3"].map((k) => (
+              <Skeleton key={k} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : totalLaptops === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-10 gap-2"
+            data-ocid="dashboard.empty_state"
+          >
+            <Laptop className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              No laptops found in inventory
+            </p>
+          </div>
+        ) : (
+          <div className="p-5 space-y-3">
+            {laptopAgeBuckets.map((bucket) => (
+              <div key={bucket.key} className="flex items-center gap-3">
+                <div className="w-28 flex-shrink-0">
+                  <span className="text-sm font-medium text-foreground">
+                    {bucket.label}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden mr-3">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${(bucket.count / maxBucketCount) * 100}%`,
+                          backgroundColor:
+                            bucket.key === "unknown"
+                              ? "oklch(var(--muted-foreground))"
+                              : "oklch(var(--accent))",
+                          opacity: bucket.key === "unknown" ? 0.5 : 1,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-muted-foreground w-5 text-right flex-shrink-0">
+                      {bucket.count}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 px-2 flex-shrink-0"
+                  disabled={bucket.count === 0}
+                  onClick={() => onNavigate?.("inventory", `age:${bucket.key}`)}
+                  data-ocid="dashboard.secondary_button"
+                >
+                  View
+                </Button>
+              </div>
+            ))}
+          </div>
         )}
       </motion.div>
     </div>

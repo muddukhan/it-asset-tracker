@@ -663,8 +663,17 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function AdminPage({ onBack }: { onBack?: () => void }) {
-  const { data: isAdmin, isLoading: adminLoading } = useIsCallerAdmin();
+export function AdminPage({
+  onBack,
+  localSession,
+}: {
+  onBack?: () => void;
+  localSession?: { name: string; accessLevel: string } | null;
+}) {
+  const { data: isAdminFromChain, isLoading: adminLoading } =
+    useIsCallerAdmin();
+  const isLocalAdmin = localSession?.accessLevel === "admin";
+  const isAdmin = isLocalAdmin || isAdminFromChain;
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: usersWithRoles, isLoading: usersLoading } =
     useGetAllUsersWithRoles(isAdmin ?? false);

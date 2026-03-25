@@ -152,14 +152,19 @@ function AppShell() {
     switch (pageState.page) {
       case "dashboard":
         return <DashboardPage onNavigate={navigate} />;
-      case "inventory":
+      case "inventory": {
+        const isAgeFilter = pageState.filter?.startsWith("age:");
         return (
           <InventoryPage
             key={pageState.filter}
-            initialStatusFilter={pageState.filter}
+            initialStatusFilter={isAgeFilter ? undefined : pageState.filter}
+            initialAgeFilter={
+              isAgeFilter ? pageState.filter?.replace("age:", "") : undefined
+            }
             onBack={previousPage === "dashboard" ? goBack : undefined}
           />
         );
+      }
       case "assignments":
         return <InventoryPage key="assigned" initialStatusFilter="assigned" />;
       case "history":
@@ -178,6 +183,7 @@ function AppShell() {
         return (
           <AdminPage
             onBack={previousPage === "dashboard" ? goBack : undefined}
+            localSession={localSession}
           />
         );
       case "software":
