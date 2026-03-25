@@ -118,6 +118,7 @@ const EMPTY_FORM: StoreSoftwareInput = {
   licenseType: "",
   licenseKey: "",
   notes: "",
+  assignedTo: "",
 };
 
 export function SoftwareInventoryPage({ onBack }: Props) {
@@ -164,6 +165,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       licenseType: s.licenseType ?? "",
       licenseKey: s.licenseKey ?? "",
       notes: s.notes ?? "",
+      assignedTo: s.assignedTo ?? "",
     });
     setModalOpen(true);
   };
@@ -181,6 +183,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       licenseType: form.licenseType || undefined,
       licenseKey: form.licenseKey || undefined,
       notes: form.notes || undefined,
+      assignedTo: form.assignedTo || undefined,
     };
     try {
       if (editTarget) {
@@ -360,6 +363,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Notes
                       </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Assigned To
+                      </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
                         Actions
                       </TableHead>
@@ -405,6 +411,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                             <span className="truncate block">
                               {sw.notes || "—"}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {sw.assignedTo || "—"}
                           </TableCell>
                           <TableCell
                             className="text-right"
@@ -605,6 +614,18 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                 placeholder="Any additional notes..."
                 rows={3}
                 data-ocid="software.textarea"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="sw-assigned-to">Assigned To</Label>
+              <Input
+                id="sw-assigned-to"
+                value={form.assignedTo ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, assignedTo: e.target.value }))
+                }
+                placeholder="e.g. John Smith or EMP001"
+                data-ocid="software.input"
               />
             </div>
           </div>

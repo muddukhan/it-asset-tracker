@@ -134,6 +134,7 @@ export interface StoreSoftwareInput {
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 }
 export interface LocalUser {
     id: bigint;
@@ -195,6 +196,7 @@ export interface StoreSoftware {
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 }
 export interface UserProfile {
     name: string;
@@ -1008,6 +1010,7 @@ function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uin
     notes: [] | [string];
     licenseKey: [] | [string];
     licenseExpiry: [] | [string];
+    assignedTo: [] | [string];
 }): {
     id: bigint;
     purchaseDate?: string;
@@ -1018,6 +1021,7 @@ function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uin
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 } {
     return {
         id: value.id,
@@ -1028,7 +1032,8 @@ function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uin
         vendor: value.vendor,
         notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
         licenseKey: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseKey)),
-        licenseExpiry: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseExpiry))
+        licenseExpiry: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseExpiry)),
+        assignedTo: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assignedTo))
     };
 }
 function from_candid_record_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1199,6 +1204,7 @@ function to_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 }): {
     id: [] | [bigint];
     purchaseDate: [] | [string];
@@ -1208,6 +1214,7 @@ function to_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     notes: [] | [string];
     licenseKey: [] | [string];
     licenseExpiry: [] | [string];
+    assignedTo: [] | [string];
 } {
     return {
         id: value.id ? candid_some(value.id) : candid_none(),
@@ -1217,7 +1224,8 @@ function to_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         vendor: value.vendor,
         notes: value.notes ? candid_some(value.notes) : candid_none(),
         licenseKey: value.licenseKey ? candid_some(value.licenseKey) : candid_none(),
-        licenseExpiry: value.licenseExpiry ? candid_some(value.licenseExpiry) : candid_none()
+        licenseExpiry: value.licenseExpiry ? candid_some(value.licenseExpiry) : candid_none(),
+        assignedTo: value.assignedTo ? candid_some(value.assignedTo) : candid_none()
     };
 }
 function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {

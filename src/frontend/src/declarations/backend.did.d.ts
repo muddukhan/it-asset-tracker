@@ -101,6 +101,7 @@ export interface StoreSoftware {
   'notes' : [] | [string],
   'licenseKey' : [] | [string],
   'licenseExpiry' : [] | [string],
+  'assignedTo' : [] | [string],
 }
 export interface StoreSoftwareInput {
   'id' : [] | [bigint],
@@ -111,6 +112,7 @@ export interface StoreSoftwareInput {
   'notes' : [] | [string],
   'licenseKey' : [] | [string],
   'licenseExpiry' : [] | [string],
+  'assignedTo' : [] | [string],
 }
 export type Time = bigint;
 export interface UserProfile { 'name' : string }

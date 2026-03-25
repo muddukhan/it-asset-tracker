@@ -729,14 +729,10 @@ export function AdminPage({
 
   const handleBootstrapAdmin = async () => {
     try {
-      const success = await bootstrapAdmin.mutateAsync();
-      if (success) {
-        toast.success("You are now an admin!");
-      } else {
-        toast.error(
-          "An admin already exists. Ask your admin to grant you access.",
-        );
-      }
+      await bootstrapAdmin.mutateAsync();
+      toast.success(
+        "You are now an admin! Reload the page to access Admin panel.",
+      );
     } catch {
       toast.error("Failed to assign admin role");
     }
@@ -814,8 +810,9 @@ export function AdminPage({
                 Grant Yourself Admin Access
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                If you&apos;re the system owner, click below to instantly assign
-                yourself the admin role. Only works if no admin exists yet.
+                If you&apos;re the system owner, click below to assign yourself
+                the admin role. This will override any previous admin
+                assignment.
               </p>
             </div>
           </div>

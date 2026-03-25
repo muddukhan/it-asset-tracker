@@ -52,6 +52,7 @@ export interface StoreSoftwareInput {
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 }
 export interface LocalUser {
     id: bigint;
@@ -123,6 +124,7 @@ export interface StoreSoftware {
     notes?: string;
     licenseKey?: string;
     licenseExpiry?: string;
+    assignedTo?: string;
 }
 export interface UserProfile {
     name: string;

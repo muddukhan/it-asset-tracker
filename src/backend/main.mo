@@ -139,7 +139,7 @@ actor {
     role : AccessControl.UserRole;
   };
 
-  // Software Inventory Types
+  // Software Inventory Input type (includes assignedTo for API consumers)
   public type StoreSoftwareInput = {
     id : ?Nat;
     name : Text;
@@ -149,8 +149,10 @@ actor {
     licenseKey : ?Text;
     licenseType : ?Text;
     notes : ?Text;
+    assignedTo : ?Text;
   };
 
+  // Public Software type returned by API (includes assignedTo merged from separate map)
   public type StoreSoftware = {
     id : Nat;
     name : Text;
@@ -160,6 +162,7 @@ actor {
     licenseKey : ?Text;
     licenseType : ?Text;
     notes : ?Text;
+    assignedTo : ?Text;
     createdAt : Time.Time;
   };
 
@@ -181,6 +184,20 @@ actor {
     processorType : ?Text;
     ram : ?Text;
     storage : ?Text;
+  };
+
+  // StoreSoftwareRecord is the stable storage type — DO NOT ADD FIELDS (breaks upgrade compatibility)
+  // Use softwareAssignedTo map for new fields
+  type StoreSoftwareRecord = {
+    id : Nat;
+    name : Text;
+    vendor : Text;
+    purchaseDate : ?Text;
+    licenseExpiry : ?Text;
+    licenseKey : ?Text;
+    licenseType : ?Text;
+    notes : ?Text;
+    createdAt : Time.Time;
   };
 
   public type StoreAssignmentHistoryEntry = {
@@ -246,7 +263,10 @@ actor {
   let localUsers = Map.empty<Nat, StoreLocalUser>();
   let localUserCredentials = Map.empty<Nat, StoreLocalUserCredentials>();
   let assetEmployeeCodes = Map.empty<Nat, Text>();
-  let softwareInventory = Map.empty<Nat, StoreSoftware>();
+  // softwareInventory uses StoreSoftwareRecord (stable type - shape must not change)
+  let softwareInventory = Map.empty<Nat, StoreSoftwareRecord>();
+  // assignedTo stored separately to preserve softwareInventory stable compatibility
+  let softwareAssignedTo = Map.empty<Nat, Text>();
 
   // Helper: merge StoreAsset with its employee code into the public Asset type
   func toAsset(s : StoreAsset) : Asset {
@@ -270,6 +290,22 @@ actor {
     };
   };
 
+  // Helper: merge StoreSoftwareRecord with assignedTo into public StoreSoftware type
+  func toSoftware(s : StoreSoftwareRecord) : StoreSoftware {
+    {
+      id = s.id;
+      name = s.name;
+      vendor = s.vendor;
+      purchaseDate = s.purchaseDate;
+      licenseExpiry = s.licenseExpiry;
+      licenseKey = s.licenseKey;
+      licenseType = s.licenseType;
+      notes = s.notes;
+      assignedTo = softwareAssignedTo.get(s.id);
+      createdAt = s.createdAt;
+    };
+  };
+
   // Helper converter for LocalUser
   func toLocalUser(storeUser : StoreLocalUser) : LocalUser {
     let creds = localUserCredentials.get(storeUser.id);
@@ -285,7 +321,7 @@ actor {
     };
   };
 
-  func softwareInputToStore(input : ?Nat, software : StoreSoftwareInput, createdAt : Time.Time) : StoreSoftware {
+  func softwareInputToRecord(input : ?Nat, software : StoreSoftwareInput, createdAt : Time.Time) : StoreSoftwareRecord {
     {
       id = switch (input) {
         case (?id) { id };
@@ -299,20 +335,6 @@ actor {
       licenseType = software.licenseType;
       notes = software.notes;
       createdAt;
-    };
-  };
-
-  func toSoftwareStore(s : StoreSoftware) : StoreSoftware {
-    {
-      id = s.id;
-      name = s.name;
-      vendor = s.vendor;
-      purchaseDate = s.purchaseDate;
-      licenseExpiry = s.licenseExpiry;
-      licenseKey = s.licenseKey;
-      licenseType = s.licenseType;
-      notes = s.notes;
-      createdAt = s.createdAt;
     };
   };
 
@@ -337,6 +359,7 @@ actor {
         licenseKey = ?"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX";
         licenseType = ?"Enterprise";
         notes = ?"3-year subscription";
+        assignedTo = null;
       },
       {
         id = null;
@@ -347,6 +370,7 @@ actor {
         licenseKey = ?"YYYYY-YYYYY-YYYYY-YYYYY-YYYYY";
         licenseType = ?"Annual";
         notes = null;
+        assignedTo = null;
       },
       {
         id = null;
@@ -357,6 +381,7 @@ actor {
         licenseKey = ?"ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ";
         licenseType = ?"Business Plan";
         notes = ?"Used by entire company";
+        assignedTo = null;
       }
     ];
     samples.forEach(func(input) { ignore addSoftwareInternal(input) });
@@ -543,8 +568,13 @@ actor {
   func addSoftwareInternal(input : StoreSoftwareInput) : Nat {
     let id = nextSoftwareId;
     nextSoftwareId += 1;
-    let software : StoreSoftware = softwareInputToStore(input.id, input, Time.now());
-    softwareInventory.add(id, software);
+    let record : StoreSoftwareRecord = softwareInputToRecord(input.id, input, Time.now());
+    softwareInventory.add(id, record);
+    // Store assignedTo separately
+    switch (input.assignedTo) {
+      case (null) { softwareAssignedTo.remove(id) };
+      case (?v) { softwareAssignedTo.add(id, v) };
+    };
     id;
   };
 
@@ -732,19 +762,19 @@ actor {
     result;
   };
 
-  // Bootstrap admin - allows first user to become admin with no existing admins
+  // Bootstrap admin - force assigns caller as admin regardless of existing state
+  // This allows recovery when admin session is lost after upgrades
   public shared ({ caller }) func bootstrapAdmin() : async Bool {
     if (caller.isAnonymous()) {
       return false;
     };
-    // Check if any admin actually exists in userRoles (more robust than just the flag)
-    let hasExistingAdmin = accessControlState.userRoles.entries().any(
-      func((_, role) : (Principal.Principal, AccessControl.UserRole)) : Bool { role == #admin }
-    );
-    if (hasExistingAdmin) {
-      return false;
-    };
-    // Directly assign this caller as admin
+    // Always assign caller as admin - allows recovery after upgrades or lost sessions
+    // Clear any existing admin roles first to avoid multiple admins
+    let toRemove : [Principal.Principal] = accessControlState.userRoles.entries()
+      .filter(func((_, role) : (Principal.Principal, AccessControl.UserRole)) : Bool { role == #admin })
+      .map(func((p, _) : (Principal.Principal, AccessControl.UserRole)) : Principal.Principal { p })
+      .toArray();
+    toRemove.forEach(func(p) { accessControlState.userRoles.remove(p) });
     accessControlState.userRoles.add(caller, #admin);
     accessControlState.adminAssigned := true;
     true;
@@ -979,8 +1009,13 @@ actor {
     switch (softwareInventory.get(id)) {
       case (null) { Runtime.trap("Software not found") };
       case (?existing) {
-        let updated = softwareInputToStore(?id, input, existing.createdAt);
+        let updated = softwareInputToRecord(?id, input, existing.createdAt);
         softwareInventory.add(id, updated);
+        // Update assignedTo separately
+        switch (input.assignedTo) {
+          case (null) { softwareAssignedTo.remove(id) };
+          case (?v) { softwareAssignedTo.add(id, v) };
+        };
       };
     };
   };
@@ -990,13 +1025,14 @@ actor {
       Runtime.trap("Unauthorized: Only admins can delete software");
     };
     softwareInventory.remove(id);
+    softwareAssignedTo.remove(id);
   };
 
   public query ({ caller }) func getAllSoftware() : async [StoreSoftware] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can fetch software");
     };
-    softwareInventory.values().toArray().sort();
+    softwareInventory.values().map(toSoftware).toArray().sort();
   };
 
   public query ({ caller }) func getSoftware(id : Nat) : async StoreSoftware {
@@ -1005,7 +1041,7 @@ actor {
     };
     switch (softwareInventory.get(id)) {
       case (null) { Runtime.trap("Software not found") };
-      case (?software) { toSoftwareStore(software) };
+      case (?record) { toSoftware(record) };
     };
   };
 
@@ -1014,10 +1050,10 @@ actor {
       Runtime.trap("Unauthorized: Only users can fetch software");
     };
     softwareInventory.values().toArray().filter(
-      func(software) {
-        software.vendor.toLower().contains(#text(vendor.toLower()));
+      func(record) {
+        record.vendor.toLower().contains(#text(vendor.toLower()));
       }
-    ).sort();
+    ).map(toSoftware).sort();
   };
 
   public query ({ caller }) func searchSoftware(term : Text) : async [StoreSoftware] {
@@ -1026,9 +1062,9 @@ actor {
     };
     let lowerTerm = term.toLower();
     softwareInventory.values().toArray().filter(
-      func(software) {
-        software.name.toLower().contains(#text(lowerTerm)) or software.vendor.toLower().contains(#text(lowerTerm));
+      func(record) {
+        record.name.toLower().contains(#text(lowerTerm)) or record.vendor.toLower().contains(#text(lowerTerm));
       }
-    ).sort();
+    ).map(toSoftware).sort();
   };
 };
