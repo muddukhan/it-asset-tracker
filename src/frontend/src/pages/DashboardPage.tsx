@@ -19,13 +19,14 @@ import {
   Wrench,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AssetCategory, AssetStatus } from "../backend";
 import { StatusBadge } from "../components/StatusBadge";
 import { useGetAllAssets, useGetStats } from "../hooks/useQueries";
+import { useGetAllSoftware } from "../hooks/useSoftwareQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
 
-const STAT_SKELETONS = ["s1", "s2", "s3", "s4", "s5"] as const;
+const STAT_SKELETONS = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"] as const;
 
 const categoryIcons: Record<AssetCategory, React.ReactNode> = {
   [AssetCategory.laptop]: <Laptop className="h-5 w-5" />,
@@ -37,11 +38,49 @@ const categoryIcons: Record<AssetCategory, React.ReactNode> = {
   [AssetCategory.other]: <HardDrive className="h-5 w-5" />,
 };
 
+const categorySmallIcons: Record<AssetCategory, React.ReactNode> = {
+  [AssetCategory.laptop]: <Laptop className="h-4 w-4" />,
+  [AssetCategory.desktop]: <Monitor className="h-4 w-4" />,
+  [AssetCategory.monitor]: <Monitor className="h-4 w-4" />,
+  [AssetCategory.server]: <Server className="h-4 w-4" />,
+  [AssetCategory.printer]: <Printer className="h-4 w-4" />,
+  [AssetCategory.peripheral]: <Cpu className="h-4 w-4" />,
+  [AssetCategory.other]: <HardDrive className="h-4 w-4" />,
+};
+
 type AgeBucket = {
   key: string;
   label: string;
   count: number;
 };
+
+const AGE_BUCKETS_TEMPLATE: Omit<AgeBucket, "count">[] = [
+  { key: "lt1", label: "Under 1 Year" },
+  { key: "1to2", label: "1–2 Years" },
+  { key: "2to3", label: "2–3 Years" },
+  { key: "3to5", label: "3–5 Years" },
+  { key: "gt5", label: "5+ Years" },
+  { key: "unknown", label: "Unknown" },
+];
+
+function getAgeYears(
+  purchaseDate: string | string[] | undefined | null,
+): number | null {
+  const pd = Array.isArray(purchaseDate)
+    ? purchaseDate[0]
+    : (purchaseDate as string | undefined);
+  if (!pd) return null;
+  return (Date.now() - new Date(pd).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+function bucketAgeKey(ageYears: number | null): string {
+  if (ageYears === null) return "unknown";
+  if (ageYears < 1) return "lt1";
+  if (ageYears < 2) return "1to2";
+  if (ageYears < 3) return "2to3";
+  if (ageYears < 5) return "3to5";
+  return "gt5";
+}
 
 function StatCard({
   label,
@@ -50,6 +89,7 @@ function StatCard({
   accentColor,
   index,
   onClick,
+  warningBg,
 }: {
   label: string;
   value: number;
@@ -57,6 +97,7 @@ function StatCard({
   accentColor: string;
   index: number;
   onClick?: () => void;
+  warningBg?: boolean;
 }) {
   return (
     <motion.div
@@ -64,7 +105,11 @@ function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, duration: 0.35 }}
       onClick={onClick}
-      className={`rounded-xl p-5 shadow-card border bg-card transition-all duration-200 ${
+      className={`rounded-xl p-5 shadow-card border transition-all duration-200 ${
+        warningBg
+          ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800"
+          : "bg-card"
+      } ${
         onClick
           ? "cursor-pointer hover:shadow-md hover:ring-2 hover:ring-accent/30 hover:-translate-y-0.5"
           : ""
@@ -93,6 +138,8 @@ type Props = { onNavigate?: (page: string, filter?: string) => void };
 export function DashboardPage({ onNavigate }: Props) {
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: stats, isLoading: statsLoading } = useGetStats();
+  const { data: softwareList, isLoading: softwareLoading } =
+    useGetAllSoftware();
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -104,6 +151,29 @@ export function DashboardPage({ onNavigate }: Props) {
   const retiredCount = useMemo(() => {
     if (!assets) return 0;
     return assets.filter((a) => a.status === AssetStatus.retired).length;
+  }, [assets]);
+
+  const agingAssetsCount = useMemo(() => {
+    if (!assets) return 0;
+    return assets.filter((a) => {
+      const age = getAgeYears(a.purchaseDate);
+      return age !== null && age > 4;
+    }).length;
+  }, [assets]);
+
+  const agingAssets = useMemo(() => {
+    if (!assets) return [];
+    return assets
+      .filter((a) => {
+        const age = getAgeYears(a.purchaseDate);
+        return age !== null && age > 4;
+      })
+      .sort((a, b) => {
+        const ageA = getAgeYears(a.purchaseDate) ?? 0;
+        const ageB = getAgeYears(b.purchaseDate) ?? 0;
+        return ageB - ageA;
+      })
+      .slice(0, 10);
   }, [assets]);
 
   const warrantyAlerts = useMemo(() => {
@@ -139,46 +209,112 @@ export function DashboardPage({ onNavigate }: Props) {
       .slice(0, 5);
   }, [assets]);
 
-  const laptopAgeBuckets = useMemo((): AgeBucket[] => {
-    if (!assets) return [];
-    const laptops = assets.filter((a) => a.category === AssetCategory.laptop);
-    const buckets: AgeBucket[] = [
-      { key: "lt1", label: "Under 1 Year", count: 0 },
-      { key: "1to2", label: "1–2 Years", count: 0 },
-      { key: "2to3", label: "2–3 Years", count: 0 },
-      { key: "3to5", label: "3–5 Years", count: 0 },
-      { key: "gt5", label: "5+ Years", count: 0 },
-      { key: "unknown", label: "Unknown", count: 0 },
-    ];
-    for (const a of laptops) {
-      const pd = Array.isArray(a.purchaseDate)
-        ? a.purchaseDate[0]
-        : (a.purchaseDate as string | undefined);
-      if (!pd) {
-        buckets[5].count++;
-        continue;
+  // Compute age buckets per category
+  const categoryAgeBuckets = useMemo((): Record<string, AgeBucket[]> => {
+    if (!assets) return {};
+    const result: Record<string, AgeBucket[]> = {};
+    for (const a of assets) {
+      const cat = a.category as string;
+      if (!result[cat]) {
+        result[cat] = AGE_BUCKETS_TEMPLATE.map((b) => ({ ...b, count: 0 }));
       }
-      const ageYears =
-        (Date.now() - new Date(pd).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-      if (ageYears < 1) buckets[0].count++;
-      else if (ageYears < 2) buckets[1].count++;
-      else if (ageYears < 3) buckets[2].count++;
-      else if (ageYears < 5) buckets[3].count++;
-      else buckets[4].count++;
+      const ageYears = getAgeYears(a.purchaseDate);
+      const key = bucketAgeKey(ageYears);
+      const bucket = result[cat].find((b) => b.key === key);
+      if (bucket) bucket.count++;
     }
-    return buckets;
+    // Only keep categories where at least one asset has a purchaseDate set
+    return Object.fromEntries(
+      Object.entries(result).filter(([, buckets]) =>
+        buckets.some((b) => b.key !== "unknown" && b.count > 0),
+      ),
+    );
   }, [assets]);
 
-  const totalLaptops = useMemo(
-    () => laptopAgeBuckets.reduce((s, b) => s + b.count, 0),
-    [laptopAgeBuckets],
+  const availableAgeCats = useMemo(
+    () => Object.keys(categoryAgeBuckets) as AssetCategory[],
+    [categoryAgeBuckets],
   );
-  const maxBucketCount = Math.max(...laptopAgeBuckets.map((b) => b.count), 1);
+
+  const defaultAgeCat = useMemo(() => {
+    if (availableAgeCats.includes(AssetCategory.laptop))
+      return AssetCategory.laptop;
+    return availableAgeCats[0] ?? null;
+  }, [availableAgeCats]);
+
+  const [selectedAgeCat, setSelectedAgeCat] = useState<string | null>(null);
+
+  const activeCat = selectedAgeCat ?? defaultAgeCat;
+  const activeBuckets: AgeBucket[] = activeCat
+    ? (categoryAgeBuckets[activeCat] ?? [])
+    : [];
+  const maxBucketCount = Math.max(...activeBuckets.map((b) => b.count), 1);
+  const totalActiveCat = activeBuckets.reduce((s, b) => s + b.count, 0);
 
   const maxCategoryCount = Math.max(
     ...categoryBreakdown.map((c) => c.count),
     1,
   );
+
+  // Software expiry computed data
+  const { softwareExpired, softwareAtRisk, softwareAtRiskCount } =
+    useMemo(() => {
+      if (!softwareList) {
+        return {
+          softwareExpired: [],
+          softwareExpiringSoon: [],
+          softwareExpiringWarn: [],
+          softwareAtRisk: [],
+          softwareAtRiskCount: 0,
+        };
+      }
+      const now = Date.now();
+      const expired: typeof softwareList = [];
+      const expiringSoon: typeof softwareList = [];
+      const expiringWarn: typeof softwareList = [];
+
+      for (const sw of softwareList) {
+        const expiryStr = Array.isArray(sw.licenseExpiry)
+          ? sw.licenseExpiry[0]
+          : sw.licenseExpiry;
+        if (!expiryStr) continue;
+        const expiryDate = new Date(expiryStr);
+        if (Number.isNaN(expiryDate.getTime())) continue;
+        const daysUntil = Math.floor(
+          (expiryDate.getTime() - now) / (1000 * 60 * 60 * 24),
+        );
+        if (daysUntil < 0) {
+          expired.push(sw);
+        } else if (daysUntil <= 30) {
+          expiringSoon.push(sw);
+        } else if (daysUntil <= 90) {
+          expiringWarn.push(sw);
+        }
+      }
+
+      const atRisk = [...expired, ...expiringSoon, ...expiringWarn].sort(
+        (a, b) => {
+          const getExpiry = (s: typeof a) => {
+            const str = Array.isArray(s.licenseExpiry)
+              ? s.licenseExpiry[0]
+              : s.licenseExpiry;
+            return str ? new Date(str).getTime() : Number.POSITIVE_INFINITY;
+          };
+          return getExpiry(a) - getExpiry(b);
+        },
+      );
+
+      return {
+        softwareExpired: expired,
+        softwareExpiringSoon: expiringSoon,
+        softwareExpiringWarn: expiringWarn,
+        softwareAtRisk: atRisk,
+        softwareAtRiskCount: atRisk.length,
+      };
+    }, [softwareList]);
+
+  const softwareCardAccentColor =
+    softwareExpired.length > 0 ? "#dc2626" : "#d97706";
 
   return (
     <div className="flex flex-col gap-6">
@@ -189,8 +325,8 @@ export function DashboardPage({ onNavigate }: Props) {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {statsLoading || assetsLoading ? (
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+        {statsLoading || assetsLoading || softwareLoading ? (
           STAT_SKELETONS.map((k) => (
             <Skeleton key={k} className="h-24 rounded-xl" />
           ))
@@ -235,6 +371,28 @@ export function DashboardPage({ onNavigate }: Props) {
               accentColor="oklch(var(--muted-foreground))"
               index={4}
               onClick={() => onNavigate?.("inventory", AssetStatus.retired)}
+            />
+            <StatCard
+              label="Aging Assets"
+              value={agingAssetsCount}
+              icon={<AlertTriangle className="h-5 w-5" />}
+              accentColor="#d97706"
+              index={5}
+              warningBg
+              onClick={() => onNavigate?.("inventory", "age:gt5")}
+            />
+            <StatCard
+              label="License Alerts"
+              value={softwareAtRiskCount}
+              icon={<Package className="h-5 w-5" />}
+              accentColor={
+                softwareAtRiskCount > 0
+                  ? softwareCardAccentColor
+                  : "oklch(var(--muted-foreground))"
+              }
+              index={6}
+              warningBg={softwareAtRiskCount > 0}
+              onClick={() => onNavigate?.("software")}
             />
           </>
         )}
@@ -426,11 +584,273 @@ export function DashboardPage({ onNavigate }: Props) {
         </motion.div>
       </div>
 
-      {/* Hardware Configs panel */}
+      {/* Age Alerts Panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.27, duration: 0.35 }}
+        className="rounded-xl border border-amber-200 shadow-card bg-card overflow-hidden dark:border-amber-800"
+      >
+        <div
+          className="px-5 py-4 border-b border-amber-200 dark:border-amber-800 flex items-center gap-2"
+          style={{ backgroundColor: "rgb(255 251 235)" }}
+        >
+          <AlertTriangle className="h-4 w-4" style={{ color: "#d97706" }} />
+          <h2 className="font-semibold text-base" style={{ color: "#92400e" }}>
+            Age Alerts
+          </h2>
+          <span className="text-xs" style={{ color: "#b45309" }}>
+            Assets older than 4 years
+          </span>
+          {agingAssets.length > 0 && (
+            <span
+              className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "#fde68a", color: "#92400e" }}
+            >
+              {agingAssetsCount}
+            </span>
+          )}
+        </div>
+        {assetsLoading ? (
+          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+            {["ag1", "ag2", "ag3"].map((k) => (
+              <Skeleton key={k} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : agingAssets.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-10 gap-2"
+            data-ocid="dashboard.empty_state"
+          >
+            <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              No assets older than 4 years
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {agingAssets.map((asset, i) => {
+              const ageYears = getAgeYears(asset.purchaseDate);
+              const ageLabel =
+                ageYears !== null ? `${ageYears.toFixed(1)} yrs` : "Unknown";
+              return (
+                <li
+                  key={String(asset.id)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-amber-50/50 transition-colors"
+                  data-ocid={`dashboard.item.${i + 1}`}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: "#fde68a", color: "#92400e" }}
+                  >
+                    {categorySmallIcons[asset.category]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {asset.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {asset.category}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs flex-shrink-0"
+                    style={{
+                      borderColor: "#f59e0b",
+                      color: "#92400e",
+                      backgroundColor: "#fef3c7",
+                    }}
+                  >
+                    {ageLabel}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2 flex-shrink-0"
+                    onClick={() => onNavigate?.("inventory", asset.category)}
+                    data-ocid="dashboard.secondary_button"
+                  >
+                    View
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </motion.div>
+
+      {/* Software License Alerts Panel */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.35 }}
+        className="rounded-xl border shadow-card bg-card overflow-hidden"
+        data-ocid="dashboard.software_expiry_alerts"
+      >
+        <div
+          className="px-5 py-4 border-b flex items-center gap-2"
+          style={{
+            backgroundColor:
+              softwareAtRiskCount > 0
+                ? softwareExpired.length > 0
+                  ? "rgb(254 242 242)"
+                  : "rgb(255 251 235)"
+                : undefined,
+            borderBottomColor:
+              softwareAtRiskCount > 0
+                ? softwareExpired.length > 0
+                  ? "#fecaca"
+                  : "#fde68a"
+                : undefined,
+          }}
+        >
+          <Package
+            className="h-4 w-4"
+            style={{
+              color:
+                softwareAtRiskCount > 0
+                  ? softwareExpired.length > 0
+                    ? "#dc2626"
+                    : "#d97706"
+                  : undefined,
+            }}
+          />
+          <h2
+            className="font-semibold text-base"
+            style={{
+              color:
+                softwareAtRiskCount > 0
+                  ? softwareExpired.length > 0
+                    ? "#991b1b"
+                    : "#92400e"
+                  : undefined,
+            }}
+          >
+            Software License Alerts
+          </h2>
+          <span
+            className="text-xs text-muted-foreground"
+            style={{
+              color:
+                softwareAtRiskCount > 0
+                  ? softwareExpired.length > 0
+                    ? "#b91c1c"
+                    : "#b45309"
+                  : undefined,
+            }}
+          >
+            Expired or expiring within 90 days
+          </span>
+          {softwareAtRiskCount > 0 && (
+            <span
+              className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                backgroundColor:
+                  softwareExpired.length > 0 ? "#fecaca" : "#fde68a",
+                color: softwareExpired.length > 0 ? "#991b1b" : "#92400e",
+              }}
+            >
+              {softwareAtRiskCount}
+            </span>
+          )}
+        </div>
+
+        {softwareLoading ? (
+          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+            {["sl1", "sl2", "sl3"].map((k) => (
+              <Skeleton key={k} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : softwareAtRisk.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-10 gap-2"
+            data-ocid="dashboard.empty_state"
+          >
+            <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              All licenses are up to date
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {softwareAtRisk.map((sw, i) => {
+              const expiryStr = Array.isArray(sw.licenseExpiry)
+                ? sw.licenseExpiry[0]
+                : sw.licenseExpiry;
+              const expiryDate = expiryStr ? new Date(expiryStr) : null;
+              const daysUntil = expiryDate
+                ? Math.floor(
+                    (expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+                  )
+                : null;
+
+              let badgeLabel = "";
+              let badgeBg = "";
+              let badgeColor = "";
+
+              if (daysUntil !== null && daysUntil < 0) {
+                badgeLabel = "Expired";
+                badgeBg = "#fecaca";
+                badgeColor = "#991b1b";
+              } else if (daysUntil !== null && daysUntil <= 30) {
+                badgeLabel = "Expiring Soon";
+                badgeBg = "#fde68a";
+                badgeColor = "#92400e";
+              } else if (daysUntil !== null) {
+                badgeLabel = `Expiring in ${daysUntil}d`;
+                badgeBg = "#fef9c3";
+                badgeColor = "#713f12";
+              }
+
+              return (
+                <li
+                  key={String(sw.id)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
+                  data-ocid={`dashboard.item.${i + 1}`}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: badgeBg, color: badgeColor }}
+                  >
+                    <Package className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {sw.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {sw.vendor && <span>{sw.vendor}</span>}
+                      {expiryDate && (
+                        <span className={sw.vendor ? " · " : ""}>
+                          Expires: {expiryDate.toLocaleDateString()}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs flex-shrink-0"
+                    style={{
+                      borderColor: badgeBg,
+                      backgroundColor: badgeBg,
+                      color: badgeColor,
+                    }}
+                  >
+                    {badgeLabel}
+                  </Badge>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </motion.div>
+
+      {/* Hardware Configs panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.33, duration: 0.35 }}
         className="rounded-xl border shadow-card bg-card overflow-hidden"
       >
         <div className="px-5 py-4 border-b flex items-center gap-2">
@@ -509,79 +929,112 @@ export function DashboardPage({ onNavigate }: Props) {
         )}
       </motion.div>
 
-      {/* Laptop Age Distribution panel */}
+      {/* Asset Age by Category panel (replaces Laptop Age Distribution) */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.36, duration: 0.35 }}
         className="rounded-xl border shadow-card bg-card overflow-hidden"
       >
-        <div className="px-5 py-4 border-b flex items-center gap-2">
-          <Laptop className="h-4 w-4 text-muted-foreground" />
+        <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-semibold text-base text-foreground">
-            Laptop Age Distribution
+            Asset Age by Category
           </h2>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {totalLaptops} laptop{totalLaptops !== 1 ? "s" : ""} total
-          </span>
+          {activeCat && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              {totalActiveCat} asset{totalActiveCat !== 1 ? "s" : ""} with
+              purchase date
+            </span>
+          )}
         </div>
+
         {assetsLoading ? (
           <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
             {["a1", "a2", "a3"].map((k) => (
               <Skeleton key={k} className="h-10 w-full" />
             ))}
           </div>
-        ) : totalLaptops === 0 ? (
+        ) : availableAgeCats.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center py-10 gap-2"
             data-ocid="dashboard.empty_state"
           >
-            <Laptop className="h-8 w-8 text-muted-foreground" />
+            <BarChart3 className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              No laptops found in inventory
+              No assets with purchase dates found
             </p>
           </div>
         ) : (
-          <div className="p-5 space-y-3">
-            {laptopAgeBuckets.map((bucket) => (
-              <div key={bucket.key} className="flex items-center gap-3">
-                <div className="w-28 flex-shrink-0">
-                  <span className="text-sm font-medium text-foreground">
-                    {bucket.label}
+          <div>
+            {/* Category tabs */}
+            <div className="px-5 pt-4 pb-2 flex gap-2 flex-wrap border-b">
+              {availableAgeCats.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedAgeCat(cat)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                    activeCat === cat
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  }`}
+                  data-ocid="dashboard.tab"
+                >
+                  <span className="opacity-80">
+                    {categorySmallIcons[cat as AssetCategory]}
                   </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden mr-3">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${(bucket.count / maxBucketCount) * 100}%`,
-                          backgroundColor:
-                            bucket.key === "unknown"
-                              ? "oklch(var(--muted-foreground))"
-                              : "oklch(var(--accent))",
-                          opacity: bucket.key === "unknown" ? 0.5 : 1,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground w-5 text-right flex-shrink-0">
-                      {bucket.count}
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Buckets */}
+            <div className="p-5 space-y-3">
+              {activeBuckets.map((bucket) => (
+                <div key={bucket.key} className="flex items-center gap-3">
+                  <div className="w-28 flex-shrink-0">
+                    <span className="text-sm font-medium text-foreground">
+                      {bucket.label}
                     </span>
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden mr-3">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${(bucket.count / maxBucketCount) * 100}%`,
+                            backgroundColor:
+                              bucket.key === "unknown"
+                                ? "oklch(var(--muted-foreground))"
+                                : bucket.key === "gt5" || bucket.key === "3to5"
+                                  ? "#f59e0b"
+                                  : "oklch(var(--accent))",
+                            opacity: bucket.key === "unknown" ? 0.5 : 1,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-muted-foreground w-5 text-right flex-shrink-0">
+                        {bucket.count}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2 flex-shrink-0"
+                    disabled={bucket.count === 0}
+                    onClick={() =>
+                      onNavigate?.("inventory", `age:${bucket.key}`)
+                    }
+                    data-ocid="dashboard.secondary_button"
+                  >
+                    View
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-7 px-2 flex-shrink-0"
-                  disabled={bucket.count === 0}
-                  onClick={() => onNavigate?.("inventory", `age:${bucket.key}`)}
-                  data-ocid="dashboard.secondary_button"
-                >
-                  View
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </motion.div>

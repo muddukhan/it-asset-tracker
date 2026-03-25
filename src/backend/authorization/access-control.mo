@@ -41,10 +41,7 @@ module {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
-      case (null) {
-        // Return guest instead of trapping for unregistered users
-        #guest
-      };
+      case (null) { #guest };
     };
   };
 

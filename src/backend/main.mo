@@ -649,8 +649,11 @@ actor {
     if (caller.isAnonymous()) {
       return false;
     };
-    // Only allow bootstrap if no admin has been assigned yet
-    if (accessControlState.adminAssigned) {
+    // Check if any admin actually exists in userRoles (more robust than just the flag)
+    let hasExistingAdmin = accessControlState.userRoles.entries().any(
+      func((_, role) : (Principal.Principal, AccessControl.UserRole)) : Bool { role == #admin }
+    );
+    if (hasExistingAdmin) {
       return false;
     };
     // Directly assign this caller as admin
