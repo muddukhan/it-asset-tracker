@@ -54,6 +54,8 @@ type PageState = {
 export interface LocalSession {
   name: string;
   accessLevel: string;
+  username?: string;
+  password?: string;
 }
 
 function loadLocalSession(): LocalSession | null {

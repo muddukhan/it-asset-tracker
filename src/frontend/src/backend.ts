@@ -234,14 +234,17 @@ export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     addAsset(input: AssetInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
+    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
     addSoftware(input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
     deleteLocalUser(id: bigint): Promise<void>;
+    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     deleteSoftware(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
+    getAllLocalUsersWithCreds(adminUsername: string, adminPassword: string): Promise<Array<LocalUser>>;
     getAllSoftware(): Promise<Array<StoreSoftware>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
@@ -263,6 +266,7 @@ export interface backendInterface {
     searchSoftware(term: string): Promise<Array<StoreSoftware>>;
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
+    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
     updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
 }
 import type { Asset as _Asset, AssetCategory as _AssetCategory, AssetInput as _AssetInput, AssetStatus as _AssetStatus, AssignmentHistoryEntry as _AssignmentHistoryEntry, ExternalBlob as _ExternalBlob, LocalUser as _LocalUser, LocalUserInput as _LocalUserInput, Principal as _Principal, StoreSoftware as _StoreSoftware, StoreSoftwareInput as _StoreSoftwareInput, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, UserWithRole as _UserWithRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
@@ -394,6 +398,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async addLocalUserWithCreds(arg0: string, arg1: string, arg2: LocalUserInput): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).addLocalUserWithCreds(arg0, arg1, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg2));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).addLocalUserWithCreds(arg0, arg1, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg2));
+            return result;
+        }
+    }
     async addSoftware(arg0: StoreSoftwareInput): Promise<bigint> {
         if (this.processError) {
             try {
@@ -464,6 +482,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteLocalUserWithCreds(arg0: string, arg1: string, arg2: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).deleteLocalUserWithCreds(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).deleteLocalUserWithCreds(arg0, arg1, arg2);
+            return result;
+        }
+    }
     async deleteSoftware(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -503,6 +535,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getAllLocalUsers();
+            return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getAllLocalUsersWithCreds(arg0: string, arg1: string): Promise<Array<LocalUser>> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).getAllLocalUsersWithCreds(arg0, arg1);
+                return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).getAllLocalUsersWithCreds(arg0, arg1);
             return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -797,6 +843,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateLocalUser(arg0, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async updateLocalUserWithCreds(arg0: string, arg1: string, arg2: bigint, arg3: LocalUserInput): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).updateLocalUserWithCreds(arg0, arg1, arg2, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg3));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).updateLocalUserWithCreds(arg0, arg1, arg2, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg3));
             return result;
         }
     }

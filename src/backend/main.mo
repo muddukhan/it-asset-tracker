@@ -549,6 +549,22 @@ actor {
   };
 
   // Local Users CRUD
+  // Helper: check if given credentials belong to a local admin user
+  func isLocalAdminCreds(username : Text, password : Text) : Bool {
+    if (username == "" or password == "") return false;
+    for ((id, creds) in localUserCredentials.entries()) {
+      if (creds.username == username and creds.password == password and creds.accessLevel == "admin") {
+        return true;
+      };
+    };
+    false;
+  };
+
+  // Check admin: either ICP principal admin OR valid local admin credentials
+  func isAdminCallerOrCreds(caller : Principal.Principal, adminUsername : Text, adminPassword : Text) : Bool {
+    AccessControl.hasPermission(accessControlState, caller, #admin) or isLocalAdminCreds(adminUsername, adminPassword)
+  };
+
   public shared ({ caller }) func addLocalUser(input : LocalUserInput) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can add local users");
@@ -576,11 +592,64 @@ actor {
     id;
   };
 
+  // Credential-based variant for local admin sessions (no ICP identity)
+  public shared func addLocalUserWithCreds(adminUsername : Text, adminPassword : Text, input : LocalUserInput) : async Nat {
+    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Invalid admin credentials");
+    };
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+    let localUser : StoreLocalUser = {
+      id;
+      name = input.name;
+      employeeCode = input.employeeCode;
+      department = input.department;
+      email = input.email;
+      notes = input.notes;
+    };
+    let creds : StoreLocalUserCredentials = {
+      username = input.username;
+      password = input.password;
+      accessLevel = input.accessLevel;
+    };
+    localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
+    id;
+  };
+
   public shared ({ caller }) func updateLocalUser(id : Nat, input : LocalUserInput) : async () {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can update local users");
     };
 
+    switch (localUsers.get(id)) {
+      case (null) { Runtime.trap("Local user not found") };
+      case (?existing) {
+        let updated : StoreLocalUser = {
+          id = existing.id;
+          name = input.name;
+          employeeCode = input.employeeCode;
+          department = input.department;
+          email = input.email;
+          notes = input.notes;
+        };
+        let updatedCreds : StoreLocalUserCredentials = {
+          username = input.username;
+          password = if (input.password == "") {
+            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } }
+          } else { input.password };
+          accessLevel = input.accessLevel;
+        };
+        localUsers.add(id, updated);
+        localUserCredentials.add(id, updatedCreds);
+      };
+    };
+  };
+
+  public shared func updateLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat, input : LocalUserInput) : async () {
+    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Invalid admin credentials");
+    };
     switch (localUsers.get(id)) {
       case (null) { Runtime.trap("Local user not found") };
       case (?existing) {
@@ -616,9 +685,28 @@ actor {
     localUserCredentials.remove(id);
   };
 
+  public shared func deleteLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat) : async () {
+    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Invalid admin credentials");
+    };
+    if (not localUsers.containsKey(id)) {
+      Runtime.trap("Local user not found");
+    };
+    localUsers.remove(id);
+    localUserCredentials.remove(id);
+  };
+
   public query ({ caller }) func getAllLocalUsers() : async [LocalUser] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can fetch local users");
+    };
+    localUsers.values().map(toLocalUser).toArray();
+  };
+
+  // Credential-based variant for local sessions
+  public query func getAllLocalUsersWithCreds(adminUsername : Text, adminPassword : Text) : async [LocalUser] {
+    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Invalid admin credentials");
     };
     localUsers.values().map(toLocalUser).toArray();
   };

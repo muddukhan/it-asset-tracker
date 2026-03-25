@@ -40,6 +40,8 @@ export function LoginPage({
         const session: LocalSession = {
           name: result.name,
           accessLevel: result.accessLevel,
+          username: username.trim(),
+          password: password,
         };
         localStorage.setItem("localUserSession", JSON.stringify(session));
         onLocalLogin(session);
