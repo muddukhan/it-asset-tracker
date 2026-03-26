@@ -199,32 +199,12 @@ export function useDeleteAsset() {
   });
 }
 
-function getLocalAdminCreds(): { username: string; password: string } | null {
-  try {
-    const raw = localStorage.getItem("localUserSession");
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    if (
-      session?.accessLevel === "admin" &&
-      session?.username &&
-      session?.password
-    ) {
-      return { username: session.username, password: session.password };
-    }
-  } catch {}
-  return null;
-}
-
 export function useGetAllLocalUsers() {
   const { actor, isFetching } = useActor();
   return useQuery<LocalUser[]>({
     queryKey: ["localUsers"],
     queryFn: async () => {
       if (!actor) return [];
-      const creds = getLocalAdminCreds();
-      if (creds) {
-        return actor.getAllLocalUsersWithCreds(creds.username, creds.password);
-      }
       return actor.getAllLocalUsers();
     },
     enabled: !!actor && !isFetching,
@@ -237,14 +217,6 @@ export function useAddLocalUser() {
   return useMutation({
     mutationFn: async (input: LocalUserInput) => {
       if (!actor) throw new Error("Not connected");
-      const creds = getLocalAdminCreds();
-      if (creds) {
-        return actor.addLocalUserWithCreds(
-          creds.username,
-          creds.password,
-          input,
-        );
-      }
       return actor.addLocalUser(input);
     },
     onSuccess: () => {
@@ -262,15 +234,6 @@ export function useUpdateLocalUser() {
       input,
     }: { id: bigint; input: LocalUserInput }) => {
       if (!actor) throw new Error("Not connected");
-      const creds = getLocalAdminCreds();
-      if (creds) {
-        return actor.updateLocalUserWithCreds(
-          creds.username,
-          creds.password,
-          id,
-          input,
-        );
-      }
       return actor.updateLocalUser(id, input);
     },
     onSuccess: () => {
@@ -285,14 +248,6 @@ export function useDeleteLocalUser() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
-      const creds = getLocalAdminCreds();
-      if (creds) {
-        return actor.deleteLocalUserWithCreds(
-          creds.username,
-          creds.password,
-          id,
-        );
-      }
       return actor.deleteLocalUser(id);
     },
     onSuccess: () => {

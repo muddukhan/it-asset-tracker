@@ -17,7 +17,6 @@ import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-
 actor {
   // Access control must be initialized first
   let accessControlState = AccessControl.initState();
@@ -84,6 +83,9 @@ actor {
     processorType : ?Text;
     ram : ?Text;
     storage : ?Text;
+    assetTag : ?Text;
+    vendorName : ?Text;
+    invoiceNumber : ?Text;
   };
 
   public type AssetInput = {
@@ -102,6 +104,9 @@ actor {
     processorType : ?Text;
     ram : ?Text;
     storage : ?Text;
+    assetTag : ?Text;
+    vendorName : ?Text;
+    invoiceNumber : ?Text;
   };
 
   public type AssignmentHistoryEntry = {
@@ -139,7 +144,7 @@ actor {
     role : AccessControl.UserRole;
   };
 
-  // Software Inventory Input type (includes assignedTo for API consumers)
+  // Software Inventory Input type
   public type StoreSoftwareInput = {
     id : ?Nat;
     name : Text;
@@ -150,9 +155,11 @@ actor {
     licenseType : ?Text;
     notes : ?Text;
     assignedTo : ?Text;
+    assetTag : ?Text;
+    invoiceNumber : ?Text;
   };
 
-  // Public Software type returned by API (includes assignedTo merged from separate map)
+  // Public Software type returned by API
   public type StoreSoftware = {
     id : Nat;
     name : Text;
@@ -164,10 +171,11 @@ actor {
     notes : ?Text;
     assignedTo : ?Text;
     createdAt : Time.Time;
+    assetTag : ?Text;
+    invoiceNumber : ?Text;
   };
 
   // Store Types — Do NOT change shape to preserve compatibility with (de)serialization!
-  // StoreAsset must NOT change shape to preserve stable variable compatibility
   public type StoreAsset = {
     id : Nat;
     name : Text;
@@ -225,7 +233,6 @@ actor {
     notes : ?Text;
   };
 
-  // Separate stable type for credentials - stored in a separate map to preserve StoreLocalUser compatibility
   public type StoreLocalUserCredentials = {
     username : Text;
     password : Text;
@@ -250,7 +257,6 @@ actor {
     };
   };
 
-  // Global state (will be migrated from old backend)
   var nextAssetId = 1;
   var nextHistoryId = 1;
   var nextLocalUserId = 1;
@@ -263,12 +269,16 @@ actor {
   let localUsers = Map.empty<Nat, StoreLocalUser>();
   let localUserCredentials = Map.empty<Nat, StoreLocalUserCredentials>();
   let assetEmployeeCodes = Map.empty<Nat, Text>();
-  // softwareInventory uses StoreSoftwareRecord (stable type - shape must not change)
   let softwareInventory = Map.empty<Nat, StoreSoftwareRecord>();
-  // assignedTo stored separately to preserve softwareInventory stable compatibility
   let softwareAssignedTo = Map.empty<Nat, Text>();
+  // New separate maps for new fields (preserves stable storage compatibility)
+  let assetTags = Map.empty<Nat, Text>();
+  let assetVendorNames = Map.empty<Nat, Text>();
+  let assetInvoiceNumbers = Map.empty<Nat, Text>();
+  let softwareAssetTags = Map.empty<Nat, Text>();
+  let softwareInvoiceNumbers = Map.empty<Nat, Text>();
 
-  // Helper: merge StoreAsset with its employee code into the public Asset type
+  // Helper: merge StoreAsset with all separate maps into the public Asset type
   func toAsset(s : StoreAsset) : Asset {
     {
       id = s.id;
@@ -287,10 +297,13 @@ actor {
       processorType = s.processorType;
       ram = s.ram;
       storage = s.storage;
+      assetTag = assetTags.get(s.id);
+      vendorName = assetVendorNames.get(s.id);
+      invoiceNumber = assetInvoiceNumbers.get(s.id);
     };
   };
 
-  // Helper: merge StoreSoftwareRecord with assignedTo into public StoreSoftware type
+  // Helper: merge StoreSoftwareRecord with all separate maps into public StoreSoftware type
   func toSoftware(s : StoreSoftwareRecord) : StoreSoftware {
     {
       id = s.id;
@@ -303,10 +316,11 @@ actor {
       notes = s.notes;
       assignedTo = softwareAssignedTo.get(s.id);
       createdAt = s.createdAt;
+      assetTag = softwareAssetTags.get(s.id);
+      invoiceNumber = softwareInvoiceNumbers.get(s.id);
     };
   };
 
-  // Helper converter for LocalUser
   func toLocalUser(storeUser : StoreLocalUser) : LocalUser {
     let creds = localUserCredentials.get(storeUser.id);
     {
@@ -338,7 +352,6 @@ actor {
     };
   };
 
-  // System functions
   system func preupgrade() {};
   system func postupgrade() {
     if (initialized.isEmpty()) {
@@ -360,6 +373,8 @@ actor {
         licenseType = ?"Enterprise";
         notes = ?"3-year subscription";
         assignedTo = null;
+        assetTag = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -371,6 +386,8 @@ actor {
         licenseType = ?"Annual";
         notes = null;
         assignedTo = null;
+        assetTag = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -382,6 +399,8 @@ actor {
         licenseType = ?"Business Plan";
         notes = ?"Used by entire company";
         assignedTo = null;
+        assetTag = null;
+        invoiceNumber = null;
       }
     ];
     samples.forEach(func(input) { ignore addSoftwareInternal(input) });
@@ -405,6 +424,9 @@ actor {
         processorType = ?"Intel i7";
         ram = ?"16GB";
         storage = ?"512GB SSD";
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -422,6 +444,9 @@ actor {
         processorType = ?"Intel i5";
         ram = ?"8GB";
         storage = ?"256GB SSD";
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -439,6 +464,9 @@ actor {
         processorType = ?"Intel i7";
         ram = ?"32GB";
         storage = ?"1TB HDD";
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -456,6 +484,9 @@ actor {
         processorType = null;
         ram = null;
         storage = null;
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -473,6 +504,9 @@ actor {
         processorType = null;
         ram = null;
         storage = null;
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -490,6 +524,9 @@ actor {
         processorType = null;
         ram = null;
         storage = null;
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -507,6 +544,9 @@ actor {
         processorType = ?"Intel Xeon";
         ram = ?"128GB";
         storage = ?"4TB SSD";
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
       {
         id = null;
@@ -524,6 +564,9 @@ actor {
         processorType = ?"Apple M1";
         ram = ?"16GB";
         storage = ?"1TB SSD";
+        assetTag = null;
+        vendorName = null;
+        invoiceNumber = null;
       },
     ];
 
@@ -555,10 +598,21 @@ actor {
 
     assets.add(id, asset);
 
-    // Store employee code separately
     switch (input.employeeCode) {
       case (null) { assetEmployeeCodes.remove(id) };
       case (?code) { assetEmployeeCodes.add(id, code) };
+    };
+    switch (input.assetTag) {
+      case (null) { assetTags.remove(id) };
+      case (?v) { assetTags.add(id, v) };
+    };
+    switch (input.vendorName) {
+      case (null) { assetVendorNames.remove(id) };
+      case (?v) { assetVendorNames.add(id, v) };
+    };
+    switch (input.invoiceNumber) {
+      case (null) { assetInvoiceNumbers.remove(id) };
+      case (?v) { assetInvoiceNumbers.add(id, v) };
     };
 
     id;
@@ -570,16 +624,21 @@ actor {
     nextSoftwareId += 1;
     let record : StoreSoftwareRecord = softwareInputToRecord(input.id, input, Time.now());
     softwareInventory.add(id, record);
-    // Store assignedTo separately
     switch (input.assignedTo) {
       case (null) { softwareAssignedTo.remove(id) };
       case (?v) { softwareAssignedTo.add(id, v) };
     };
+    switch (input.assetTag) {
+      case (null) { softwareAssetTags.remove(id) };
+      case (?v) { softwareAssetTags.add(id, v) };
+    };
+    switch (input.invoiceNumber) {
+      case (null) { softwareInvoiceNumbers.remove(id) };
+      case (?v) { softwareInvoiceNumbers.add(id, v) };
+    };
     id;
   };
 
-  // Local Users CRUD
-  // Helper: check if given credentials belong to a local admin user
   func isLocalAdminCreds(username : Text, password : Text) : Bool {
     if (username == "" or password == "") return false;
     for ((id, creds) in localUserCredentials.entries()) {
@@ -590,7 +649,6 @@ actor {
     false;
   };
 
-  // Check admin: either ICP principal admin OR valid local admin credentials
   func isAdminCallerOrCreds(caller : Principal.Principal, adminUsername : Text, adminPassword : Text) : Bool {
     AccessControl.hasPermission(accessControlState, caller, #admin) or isLocalAdminCreds(adminUsername, adminPassword)
   };
@@ -598,34 +656,6 @@ actor {
   public shared ({ caller }) func addLocalUser(input : LocalUserInput) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can add local users");
-    };
-
-    let id = nextLocalUserId;
-    nextLocalUserId += 1;
-
-    let localUser : StoreLocalUser = {
-      id;
-      name = input.name;
-      employeeCode = input.employeeCode;
-      department = input.department;
-      email = input.email;
-      notes = input.notes;
-    };
-    let creds : StoreLocalUserCredentials = {
-      username = input.username;
-      password = input.password;
-      accessLevel = input.accessLevel;
-    };
-
-    localUsers.add(id, localUser);
-    localUserCredentials.add(id, creds);
-    id;
-  };
-
-  // Credential-based variant for local admin sessions (no ICP identity)
-  public shared func addLocalUserWithCreds(adminUsername : Text, adminPassword : Text, input : LocalUserInput) : async Nat {
-    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
-      Runtime.trap("Unauthorized: Invalid admin credentials");
     };
     let id = nextLocalUserId;
     nextLocalUserId += 1;
@@ -651,7 +681,6 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can update local users");
     };
-
     switch (localUsers.get(id)) {
       case (null) { Runtime.trap("Local user not found") };
       case (?existing) {
@@ -666,35 +695,7 @@ actor {
         let updatedCreds : StoreLocalUserCredentials = {
           username = input.username;
           password = if (input.password == "") {
-            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } }
-          } else { input.password };
-          accessLevel = input.accessLevel;
-        };
-        localUsers.add(id, updated);
-        localUserCredentials.add(id, updatedCreds);
-      };
-    };
-  };
-
-  public shared func updateLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat, input : LocalUserInput) : async () {
-    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
-      Runtime.trap("Unauthorized: Invalid admin credentials");
-    };
-    switch (localUsers.get(id)) {
-      case (null) { Runtime.trap("Local user not found") };
-      case (?existing) {
-        let updated : StoreLocalUser = {
-          id = existing.id;
-          name = input.name;
-          employeeCode = input.employeeCode;
-          department = input.department;
-          email = input.email;
-          notes = input.notes;
-        };
-        let updatedCreds : StoreLocalUserCredentials = {
-          username = input.username;
-          password = if (input.password == "") {
-            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } }
+            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } };
           } else { input.password };
           accessLevel = input.accessLevel;
         };
@@ -715,32 +716,12 @@ actor {
     localUserCredentials.remove(id);
   };
 
-  public shared func deleteLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat) : async () {
-    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
-      Runtime.trap("Unauthorized: Invalid admin credentials");
-    };
-    if (not localUsers.containsKey(id)) {
-      Runtime.trap("Local user not found");
-    };
-    localUsers.remove(id);
-    localUserCredentials.remove(id);
-  };
-
   public query ({ caller }) func getAllLocalUsers() : async [LocalUser] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can fetch local users");
     };
     localUsers.values().map(toLocalUser).toArray();
   };
-
-  // Credential-based variant for local sessions
-  public query func getAllLocalUsersWithCreds(adminUsername : Text, adminPassword : Text) : async [LocalUser] {
-    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
-      Runtime.trap("Unauthorized: Invalid admin credentials");
-    };
-    localUsers.values().map(toLocalUser).toArray();
-  };
-
 
   // Login local user by username and password - public, no auth required
   public query func loginLocalUser(username : Text, password : Text) : async ?{ id : Nat; name : Text; accessLevel : Text } {
@@ -762,14 +743,10 @@ actor {
     result;
   };
 
-  // Bootstrap admin - force assigns caller as admin regardless of existing state
-  // This allows recovery when admin session is lost after upgrades
   public shared ({ caller }) func bootstrapAdmin() : async Bool {
     if (caller.isAnonymous()) {
       return false;
     };
-    // Always assign caller as admin - allows recovery after upgrades or lost sessions
-    // Clear any existing admin roles first to avoid multiple admins
     let toRemove : [Principal.Principal] = accessControlState.userRoles.entries()
       .filter(func((_, role) : (Principal.Principal, AccessControl.UserRole)) : Bool { role == #admin })
       .map(func((p, _) : (Principal.Principal, AccessControl.UserRole)) : Principal.Principal { p })
@@ -780,7 +757,6 @@ actor {
     true;
   };
 
-  // Get all users with their roles (admin only)
   public query ({ caller }) func getAllUsersWithRoles() : async [UserWithRole] {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can view user roles");
@@ -790,7 +766,6 @@ actor {
     ).toArray();
   };
 
-  // User Profile Functions
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -815,7 +790,6 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Public CRUD
   public shared ({ caller }) func addAsset(input : AssetInput) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can perform this action");
@@ -849,10 +823,21 @@ actor {
           storage = input.storage;
         };
 
-        // Update employee code in its separate map
         switch (input.employeeCode) {
           case (null) { assetEmployeeCodes.remove(id) };
           case (?code) { assetEmployeeCodes.add(id, code) };
+        };
+        switch (input.assetTag) {
+          case (null) { assetTags.remove(id) };
+          case (?v) { assetTags.add(id, v) };
+        };
+        switch (input.vendorName) {
+          case (null) { assetVendorNames.remove(id) };
+          case (?v) { assetVendorNames.add(id, v) };
+        };
+        switch (input.invoiceNumber) {
+          case (null) { assetInvoiceNumbers.remove(id) };
+          case (?v) { assetInvoiceNumbers.add(id, v) };
         };
 
         addToHistory(id, caller, existing.status, input);
@@ -865,9 +850,11 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can perform this action");
     };
-
     assets.remove(id);
     assetEmployeeCodes.remove(id);
+    assetTags.remove(id);
+    assetVendorNames.remove(id);
+    assetInvoiceNumbers.remove(id);
   };
 
   public query ({ caller }) func getAsset(id : Nat) : async Asset {
@@ -924,7 +911,6 @@ actor {
     ).map(toAsset).sort();
   };
 
-  // History
   func addToHistory(assetId : Nat, changedBy : Principal.Principal, fromStatus : AssetStatus, input : AssetInput) {
     let entry : StoreAssignmentHistoryEntry = {
       id = nextHistoryId;
@@ -937,7 +923,6 @@ actor {
       toStatus = input.status;
       timestamp = Time.now();
     };
-
     nextHistoryId += 1;
     history.add(entry.id, entry);
   };
@@ -957,43 +942,26 @@ actor {
     filtered.sort();
   };
 
-  // Stats
   public query ({ caller }) func getStats() : async Stats {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can perform this action");
     };
     let allAssets = assets.values().toArray();
     let total = allAssets.size();
-
     let assigned = allAssets.filter(func(asset) { asset.status == #assigned }).size();
     let inRepair = allAssets.filter(func(asset) { asset.status == #inRepair }).size();
     let available = allAssets.filter(func(asset) { asset.status == #available }).size();
-
-    {
-      total;
-      assigned;
-      inRepair;
-      available;
-    };
+    { total; assigned; inRepair; available };
   };
 
   public query ({ caller }) func getWarrantyStats() : async WarrantyStats {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can perform this action");
     };
-
     let allAssets = assets.values().toArray();
     let total = allAssets.filter(func(asset) { asset.warrantyDate != null }).size();
-
-    {
-      total;
-      expiringSoon = 0;
-      expired = 0;
-      active = total;
-    };
+    { total; expiringSoon = 0; expired = 0; active = total };
   };
-
-  // Software Inventory CRUD
 
   public shared ({ caller }) func addSoftware(input : StoreSoftwareInput) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
@@ -1011,10 +979,17 @@ actor {
       case (?existing) {
         let updated = softwareInputToRecord(?id, input, existing.createdAt);
         softwareInventory.add(id, updated);
-        // Update assignedTo separately
         switch (input.assignedTo) {
           case (null) { softwareAssignedTo.remove(id) };
           case (?v) { softwareAssignedTo.add(id, v) };
+        };
+        switch (input.assetTag) {
+          case (null) { softwareAssetTags.remove(id) };
+          case (?v) { softwareAssetTags.add(id, v) };
+        };
+        switch (input.invoiceNumber) {
+          case (null) { softwareInvoiceNumbers.remove(id) };
+          case (?v) { softwareInvoiceNumbers.add(id, v) };
         };
       };
     };
@@ -1026,45 +1001,21 @@ actor {
     };
     softwareInventory.remove(id);
     softwareAssignedTo.remove(id);
+    softwareAssetTags.remove(id);
+    softwareInvoiceNumbers.remove(id);
   };
 
   public query ({ caller }) func getAllSoftware() : async [StoreSoftware] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can fetch software");
+      Runtime.trap("Unauthorized: Only users can view software");
     };
     softwareInventory.values().map(toSoftware).toArray().sort();
   };
 
-  public query ({ caller }) func getSoftware(id : Nat) : async StoreSoftware {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can fetch software");
+  public shared ({ caller }) func assignRole(user : Principal.Principal, role : AccessControl.UserRole) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can assign roles");
     };
-    switch (softwareInventory.get(id)) {
-      case (null) { Runtime.trap("Software not found") };
-      case (?record) { toSoftware(record) };
-    };
-  };
-
-  public query ({ caller }) func getSoftwareByVendor(vendor : Text) : async [StoreSoftware] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can fetch software");
-    };
-    softwareInventory.values().toArray().filter(
-      func(record) {
-        record.vendor.toLower().contains(#text(vendor.toLower()));
-      }
-    ).map(toSoftware).sort();
-  };
-
-  public query ({ caller }) func searchSoftware(term : Text) : async [StoreSoftware] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can fetch software");
-    };
-    let lowerTerm = term.toLower();
-    softwareInventory.values().toArray().filter(
-      func(record) {
-        record.name.toLower().contains(#text(lowerTerm)) or record.vendor.toLower().contains(#text(lowerTerm));
-      }
-    ).map(toSoftware).sort();
+    accessControlState.userRoles.add(user, role);
   };
 };

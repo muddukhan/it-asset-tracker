@@ -44,17 +44,23 @@ export const AssetInput = IDL.Record({
   'purchaseDate' : IDL.Opt(IDL.Text),
   'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
+  'invoiceNumber' : IDL.Opt(IDL.Text),
   'serialNumber' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'category' : AssetCategory,
   'warrantyDate' : IDL.Opt(IDL.Text),
   'assignedUser' : IDL.Opt(IDL.Text),
+  'assetTag' : IDL.Opt(IDL.Text),
   'processorType' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
+  'vendorName' : IDL.Opt(IDL.Text),
   'photoId' : IDL.Opt(ExternalBlob),
 });
 export const LocalUserInput = IDL.Record({
+  'accessLevel' : IDL.Text,
   'employeeCode' : IDL.Text,
+  'username' : IDL.Text,
+  'password' : IDL.Text,
   'name' : IDL.Text,
   'email' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
@@ -62,12 +68,15 @@ export const LocalUserInput = IDL.Record({
 });
 export const StoreSoftwareInput = IDL.Record({
   'id' : IDL.Opt(IDL.Nat),
+  'assignedTo' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
+  'invoiceNumber' : IDL.Opt(IDL.Text),
   'licenseType' : IDL.Opt(IDL.Text),
   'vendor' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'licenseKey' : IDL.Opt(IDL.Text),
+  'assetTag' : IDL.Opt(IDL.Text),
   'licenseExpiry' : IDL.Opt(IDL.Text),
 });
 export const UserRole = IDL.Variant({
@@ -75,6 +84,7 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const Principal = IDL.Principal;
 export const Time = IDL.Int;
 export const Asset = IDL.Record({
   'id' : IDL.Nat,
@@ -85,18 +95,23 @@ export const Asset = IDL.Record({
   'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'createdAt' : Time,
+  'invoiceNumber' : IDL.Opt(IDL.Text),
   'serialNumber' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'category' : AssetCategory,
   'warrantyDate' : IDL.Opt(IDL.Text),
   'assignedUser' : IDL.Opt(IDL.Text),
+  'assetTag' : IDL.Opt(IDL.Text),
   'processorType' : IDL.Opt(IDL.Text),
   'location' : IDL.Text,
+  'vendorName' : IDL.Opt(IDL.Text),
   'photoId' : IDL.Opt(ExternalBlob),
 });
 export const LocalUser = IDL.Record({
   'id' : IDL.Nat,
+  'accessLevel' : IDL.Text,
   'employeeCode' : IDL.Text,
+  'username' : IDL.Text,
   'name' : IDL.Text,
   'email' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
@@ -104,16 +119,18 @@ export const LocalUser = IDL.Record({
 });
 export const StoreSoftware = IDL.Record({
   'id' : IDL.Nat,
+  'assignedTo' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'createdAt' : Time,
+  'invoiceNumber' : IDL.Opt(IDL.Text),
   'licenseType' : IDL.Opt(IDL.Text),
   'vendor' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
   'licenseKey' : IDL.Opt(IDL.Text),
+  'assetTag' : IDL.Opt(IDL.Text),
   'licenseExpiry' : IDL.Opt(IDL.Text),
 });
-export const Principal = IDL.Principal;
 export const UserWithRole = IDL.Record({
   'principal' : Principal,
   'role' : UserRole,
@@ -173,17 +190,15 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
   'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
-  'addLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, LocalUserInput], [IDL.Nat], []),
   'addSoftware' : IDL.Func([StoreSoftwareInput], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'assignRole' : IDL.Func([Principal, UserRole], [], []),
   'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
   'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
-  'deleteLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat], [], []),
   'deleteSoftware' : IDL.Func([IDL.Nat], [], []),
   'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
   'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
-  'getAllLocalUsersWithCreds' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(LocalUser)], ['query']),
   'getAllSoftware' : IDL.Func([], [IDL.Vec(StoreSoftware)], ['query']),
   'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
   'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
@@ -202,22 +217,27 @@ export const idlService = IDL.Service({
       [IDL.Vec(AssignmentHistoryEntry)],
       ['query'],
     ),
-  'getSoftware' : IDL.Func([IDL.Nat], [StoreSoftware], ['query']),
-  'getSoftwareByVendor' : IDL.Func(
-      [IDL.Text],
-      [IDL.Vec(StoreSoftware)],
-      ['query'],
-    ),
   'getStats' : IDL.Func([], [Stats], ['query']),
   'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
   'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'loginLocalUser' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [
+        IDL.Opt(
+          IDL.Record({
+            'id' : IDL.Nat,
+            'accessLevel' : IDL.Text,
+            'name' : IDL.Text,
+          })
+        ),
+      ],
+      ['query'],
+    ),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
-  'searchSoftware' : IDL.Func([IDL.Text], [IDL.Vec(StoreSoftware)], ['query']),
   'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
   'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
-  'updateLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, LocalUserInput], [], []),
   'updateSoftware' : IDL.Func([IDL.Nat, StoreSoftwareInput], [], []),
 });
 
@@ -260,17 +280,23 @@ export const idlFactory = ({ IDL }) => {
     'purchaseDate' : IDL.Opt(IDL.Text),
     'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
+    'invoiceNumber' : IDL.Opt(IDL.Text),
     'serialNumber' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'category' : AssetCategory,
     'warrantyDate' : IDL.Opt(IDL.Text),
     'assignedUser' : IDL.Opt(IDL.Text),
+    'assetTag' : IDL.Opt(IDL.Text),
     'processorType' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
+    'vendorName' : IDL.Opt(IDL.Text),
     'photoId' : IDL.Opt(ExternalBlob),
   });
   const LocalUserInput = IDL.Record({
+    'accessLevel' : IDL.Text,
     'employeeCode' : IDL.Text,
+    'username' : IDL.Text,
+    'password' : IDL.Text,
     'name' : IDL.Text,
     'email' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
@@ -278,12 +304,15 @@ export const idlFactory = ({ IDL }) => {
   });
   const StoreSoftwareInput = IDL.Record({
     'id' : IDL.Opt(IDL.Nat),
+    'assignedTo' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
+    'invoiceNumber' : IDL.Opt(IDL.Text),
     'licenseType' : IDL.Opt(IDL.Text),
     'vendor' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'licenseKey' : IDL.Opt(IDL.Text),
+    'assetTag' : IDL.Opt(IDL.Text),
     'licenseExpiry' : IDL.Opt(IDL.Text),
   });
   const UserRole = IDL.Variant({
@@ -291,6 +320,7 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const Principal = IDL.Principal;
   const Time = IDL.Int;
   const Asset = IDL.Record({
     'id' : IDL.Nat,
@@ -301,18 +331,23 @@ export const idlFactory = ({ IDL }) => {
     'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'createdAt' : Time,
+    'invoiceNumber' : IDL.Opt(IDL.Text),
     'serialNumber' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'category' : AssetCategory,
     'warrantyDate' : IDL.Opt(IDL.Text),
     'assignedUser' : IDL.Opt(IDL.Text),
+    'assetTag' : IDL.Opt(IDL.Text),
     'processorType' : IDL.Opt(IDL.Text),
     'location' : IDL.Text,
+    'vendorName' : IDL.Opt(IDL.Text),
     'photoId' : IDL.Opt(ExternalBlob),
   });
   const LocalUser = IDL.Record({
     'id' : IDL.Nat,
+    'accessLevel' : IDL.Text,
     'employeeCode' : IDL.Text,
+    'username' : IDL.Text,
     'name' : IDL.Text,
     'email' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
@@ -320,16 +355,18 @@ export const idlFactory = ({ IDL }) => {
   });
   const StoreSoftware = IDL.Record({
     'id' : IDL.Nat,
+    'assignedTo' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'createdAt' : Time,
+    'invoiceNumber' : IDL.Opt(IDL.Text),
     'licenseType' : IDL.Opt(IDL.Text),
     'vendor' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
     'licenseKey' : IDL.Opt(IDL.Text),
+    'assetTag' : IDL.Opt(IDL.Text),
     'licenseExpiry' : IDL.Opt(IDL.Text),
   });
-  const Principal = IDL.Principal;
   const UserWithRole = IDL.Record({
     'principal' : Principal,
     'role' : UserRole,
@@ -389,17 +426,15 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addAsset' : IDL.Func([AssetInput], [IDL.Nat], []),
     'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
-  'addLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, LocalUserInput], [IDL.Nat], []),
     'addSoftware' : IDL.Func([StoreSoftwareInput], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'assignRole' : IDL.Func([Principal, UserRole], [], []),
     'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
     'deleteLocalUser' : IDL.Func([IDL.Nat], [], []),
-  'deleteLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat], [], []),
     'deleteSoftware' : IDL.Func([IDL.Nat], [], []),
     'getAllAssets' : IDL.Func([], [IDL.Vec(Asset)], ['query']),
     'getAllLocalUsers' : IDL.Func([], [IDL.Vec(LocalUser)], ['query']),
-  'getAllLocalUsersWithCreds' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(LocalUser)], ['query']),
     'getAllSoftware' : IDL.Func([], [IDL.Vec(StoreSoftware)], ['query']),
     'getAllUsersWithRoles' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
     'getAsset' : IDL.Func([IDL.Nat], [Asset], ['query']),
@@ -418,26 +453,27 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(AssignmentHistoryEntry)],
         ['query'],
       ),
-    'getSoftware' : IDL.Func([IDL.Nat], [StoreSoftware], ['query']),
-    'getSoftwareByVendor' : IDL.Func(
-        [IDL.Text],
-        [IDL.Vec(StoreSoftware)],
-        ['query'],
-      ),
     'getStats' : IDL.Func([], [Stats], ['query']),
     'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
     'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
-    'searchSoftware' : IDL.Func(
-        [IDL.Text],
-        [IDL.Vec(StoreSoftware)],
+    'loginLocalUser' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'id' : IDL.Nat,
+              'accessLevel' : IDL.Text,
+              'name' : IDL.Text,
+            })
+          ),
+        ],
         ['query'],
       ),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
     'updateAsset' : IDL.Func([IDL.Nat, AssetInput], [], []),
     'updateLocalUser' : IDL.Func([IDL.Nat, LocalUserInput], [], []),
-  'updateLocalUserWithCreds' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, LocalUserInput], [], []),
     'updateSoftware' : IDL.Func([IDL.Nat, StoreSoftwareInput], [], []),
   });
 };

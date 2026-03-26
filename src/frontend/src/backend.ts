@@ -127,25 +127,32 @@ export interface AssignmentHistoryEntry {
 }
 export interface StoreSoftwareInput {
     id?: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 }
 export interface LocalUser {
     id: bigint;
+    accessLevel: string;
     employeeCode: string;
+    username: string;
     name: string;
     email: string;
     notes?: string;
     department: string;
 }
 export interface LocalUserInput {
+    accessLevel: string;
     employeeCode: string;
+    username: string;
+    password: string;
     name: string;
     email: string;
     notes?: string;
@@ -159,13 +166,16 @@ export interface AssetInput {
     purchaseDate?: string;
     storage?: string;
     name: string;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }
 export interface Asset {
@@ -177,26 +187,31 @@ export interface Asset {
     storage?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }
 export interface StoreSoftware {
     id: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 }
 export interface UserProfile {
     name: string;
@@ -236,17 +251,15 @@ export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     addAsset(input: AssetInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
-    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
     addSoftware(input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    assignRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
     deleteLocalUser(id: bigint): Promise<void>;
-    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     deleteSoftware(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
-    getAllLocalUsersWithCreds(adminUsername: string, adminPassword: string): Promise<Array<LocalUser>>;
     getAllSoftware(): Promise<Array<StoreSoftware>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
@@ -257,18 +270,19 @@ export interface backendInterface {
     getCallerUserRole(): Promise<UserRole>;
     getHistory(): Promise<Array<AssignmentHistoryEntry>>;
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
-    getSoftware(id: bigint): Promise<StoreSoftware>;
-    getSoftwareByVendor(vendor: string): Promise<Array<StoreSoftware>>;
     getStats(): Promise<Stats>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
     isCallerAdmin(): Promise<boolean>;
+    loginLocalUser(username: string, password: string): Promise<{
+        id: bigint;
+        accessLevel: string;
+        name: string;
+    } | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
-    searchSoftware(term: string): Promise<Array<StoreSoftware>>;
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
-    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
     updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
 }
 import type { Asset as _Asset, AssetCategory as _AssetCategory, AssetInput as _AssetInput, AssetStatus as _AssetStatus, AssignmentHistoryEntry as _AssignmentHistoryEntry, ExternalBlob as _ExternalBlob, LocalUser as _LocalUser, LocalUserInput as _LocalUserInput, Principal as _Principal, StoreSoftware as _StoreSoftware, StoreSoftwareInput as _StoreSoftwareInput, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, UserWithRole as _UserWithRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
@@ -400,20 +414,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async addLocalUserWithCreds(arg0: string, arg1: string, arg2: LocalUserInput): Promise<bigint> {
-        if (this.processError) {
-            try {
-                const result = await (this.actor as any).addLocalUserWithCreds(arg0, arg1, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg2));
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await (this.actor as any).addLocalUserWithCreds(arg0, arg1, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg2));
-            return result;
-        }
-    }
     async addSoftware(arg0: StoreSoftwareInput): Promise<bigint> {
         if (this.processError) {
             try {
@@ -439,6 +439,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n19(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async assignRole(arg0: Principal, arg1: UserRole): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignRole(arg0, to_candid_UserRole_n19(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignRole(arg0, to_candid_UserRole_n19(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
@@ -484,20 +498,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async deleteLocalUserWithCreds(arg0: string, arg1: string, arg2: bigint): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await (this.actor as any).deleteLocalUserWithCreds(arg0, arg1, arg2);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await (this.actor as any).deleteLocalUserWithCreds(arg0, arg1, arg2);
-            return result;
-        }
-    }
     async deleteSoftware(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -537,20 +537,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getAllLocalUsers();
-            return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getAllLocalUsersWithCreds(arg0: string, arg1: string): Promise<Array<LocalUser>> {
-        if (this.processError) {
-            try {
-                const result = await (this.actor as any).getAllLocalUsersWithCreds(arg0, arg1);
-                return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await (this.actor as any).getAllLocalUsersWithCreds(arg0, arg1);
             return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -694,34 +680,6 @@ export class Backend implements backendInterface {
             return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getSoftware(arg0: bigint): Promise<StoreSoftware> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getSoftware(arg0);
-                return from_candid_StoreSoftware_n35(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getSoftware(arg0);
-            return from_candid_StoreSoftware_n35(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getSoftwareByVendor(arg0: string): Promise<Array<StoreSoftware>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getSoftwareByVendor(arg0);
-                return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getSoftwareByVendor(arg0);
-            return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
-        }
-    }
     async getStats(): Promise<Stats> {
         if (this.processError) {
             try {
@@ -778,6 +736,24 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async loginLocalUser(arg0: string, arg1: string): Promise<{
+        id: bigint;
+        accessLevel: string;
+        name: string;
+    } | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.loginLocalUser(arg0, arg1);
+                return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.loginLocalUser(arg0, arg1);
+            return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
@@ -806,20 +782,6 @@ export class Backend implements backendInterface {
             return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
         }
     }
-    async searchSoftware(arg0: string): Promise<Array<StoreSoftware>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.searchSoftware(arg0);
-                return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.searchSoftware(arg0);
-            return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
-        }
-    }
     async updateAsset(arg0: bigint, arg1: AssetInput): Promise<void> {
         if (this.processError) {
             try {
@@ -845,20 +807,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateLocalUser(arg0, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg1));
-            return result;
-        }
-    }
-    async updateLocalUserWithCreds(arg0: string, arg1: string, arg2: bigint, arg3: LocalUserInput): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await (this.actor as any).updateLocalUserWithCreds(arg0, arg1, arg2, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg3));
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await (this.actor as any).updateLocalUserWithCreds(arg0, arg1, arg2, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, arg3));
             return result;
         }
     }
@@ -916,6 +864,17 @@ async function from_candid_opt_n29(_uploadFile: (file: ExternalBlob) => Promise<
 function from_candid_opt_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
     return value.length === 0 ? null : value[0];
 }
+function from_candid_opt_n46(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [{
+        id: bigint;
+        accessLevel: string;
+        name: string;
+    }]): {
+    id: bigint;
+    accessLevel: string;
+    name: string;
+} | null {
+    return value.length === 0 ? null : value[0];
+}
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
 }
@@ -931,13 +890,16 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     storage: [] | [string];
     name: string;
     createdAt: _Time;
+    invoiceNumber: [] | [string];
     serialNumber: string;
     notes: [] | [string];
     category: _AssetCategory;
     warrantyDate: [] | [string];
     assignedUser: [] | [string];
+    assetTag: [] | [string];
     processorType: [] | [string];
     location: string;
+    vendorName: [] | [string];
     photoId: [] | [_ExternalBlob];
 }): Promise<{
     id: bigint;
@@ -948,13 +910,16 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     storage?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }> {
     return {
@@ -966,26 +931,33 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
         storage: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.storage)),
         name: value.name,
         createdAt: value.createdAt,
+        invoiceNumber: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.invoiceNumber)),
         serialNumber: value.serialNumber,
         notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
         category: from_candid_AssetCategory_n27(_uploadFile, _downloadFile, value.category),
         warrantyDate: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.warrantyDate)),
         assignedUser: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assignedUser)),
+        assetTag: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assetTag)),
         processorType: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.processorType)),
         location: value.location,
+        vendorName: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.vendorName)),
         photoId: record_opt_to_undefined(await from_candid_opt_n29(_uploadFile, _downloadFile, value.photoId))
     };
 }
 function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
+    accessLevel: string;
     employeeCode: string;
+    username: string;
     name: string;
     email: string;
     notes: [] | [string];
     department: string;
 }): {
     id: bigint;
+    accessLevel: string;
     employeeCode: string;
+    username: string;
     name: string;
     email: string;
     notes?: string;
@@ -993,7 +965,9 @@ function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         id: value.id,
+        accessLevel: value.accessLevel,
         employeeCode: value.employeeCode,
+        username: value.username,
         name: value.name,
         email: value.email,
         notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
@@ -1002,38 +976,44 @@ function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uin
 }
 function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
+    assignedTo: [] | [string];
     purchaseDate: [] | [string];
     name: string;
     createdAt: _Time;
+    invoiceNumber: [] | [string];
     licenseType: [] | [string];
     vendor: string;
     notes: [] | [string];
     licenseKey: [] | [string];
+    assetTag: [] | [string];
     licenseExpiry: [] | [string];
-    assignedTo: [] | [string];
 }): {
     id: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 } {
     return {
         id: value.id,
+        assignedTo: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assignedTo)),
         purchaseDate: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.purchaseDate)),
         name: value.name,
         createdAt: value.createdAt,
+        invoiceNumber: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.invoiceNumber)),
         licenseType: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseType)),
         vendor: value.vendor,
         notes: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.notes)),
         licenseKey: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseKey)),
-        licenseExpiry: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseExpiry)),
-        assignedTo: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assignedTo))
+        assetTag: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.assetTag)),
+        licenseExpiry: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.licenseExpiry))
     };
 }
 function from_candid_record_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1175,20 +1155,29 @@ function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Arra
     return value === null ? candid_none() : candid_some(to_candid__CaffeineStorageRefillInformation_n2(_uploadFile, _downloadFile, value));
 }
 function to_candid_record_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    accessLevel: string;
     employeeCode: string;
+    username: string;
+    password: string;
     name: string;
     email: string;
     notes?: string;
     department: string;
 }): {
+    accessLevel: string;
     employeeCode: string;
+    username: string;
+    password: string;
     name: string;
     email: string;
     notes: [] | [string];
     department: string;
 } {
     return {
+        accessLevel: value.accessLevel,
         employeeCode: value.employeeCode,
+        username: value.username,
+        password: value.password,
         name: value.name,
         email: value.email,
         notes: value.notes ? candid_some(value.notes) : candid_none(),
@@ -1197,35 +1186,41 @@ function to_candid_record_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 }
 function to_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id?: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 }): {
     id: [] | [bigint];
+    assignedTo: [] | [string];
     purchaseDate: [] | [string];
     name: string;
+    invoiceNumber: [] | [string];
     licenseType: [] | [string];
     vendor: string;
     notes: [] | [string];
     licenseKey: [] | [string];
+    assetTag: [] | [string];
     licenseExpiry: [] | [string];
-    assignedTo: [] | [string];
 } {
     return {
         id: value.id ? candid_some(value.id) : candid_none(),
+        assignedTo: value.assignedTo ? candid_some(value.assignedTo) : candid_none(),
         purchaseDate: value.purchaseDate ? candid_some(value.purchaseDate) : candid_none(),
         name: value.name,
+        invoiceNumber: value.invoiceNumber ? candid_some(value.invoiceNumber) : candid_none(),
         licenseType: value.licenseType ? candid_some(value.licenseType) : candid_none(),
         vendor: value.vendor,
         notes: value.notes ? candid_some(value.notes) : candid_none(),
         licenseKey: value.licenseKey ? candid_some(value.licenseKey) : candid_none(),
-        licenseExpiry: value.licenseExpiry ? candid_some(value.licenseExpiry) : candid_none(),
-        assignedTo: value.assignedTo ? candid_some(value.assignedTo) : candid_none()
+        assetTag: value.assetTag ? candid_some(value.assetTag) : candid_none(),
+        licenseExpiry: value.licenseExpiry ? candid_some(value.licenseExpiry) : candid_none()
     };
 }
 function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1245,13 +1240,16 @@ async function to_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<
     purchaseDate?: string;
     storage?: string;
     name: string;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }): Promise<{
     id: [] | [bigint];
@@ -1261,13 +1259,16 @@ async function to_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<
     purchaseDate: [] | [string];
     storage: [] | [string];
     name: string;
+    invoiceNumber: [] | [string];
     serialNumber: string;
     notes: [] | [string];
     category: _AssetCategory;
     warrantyDate: [] | [string];
     assignedUser: [] | [string];
+    assetTag: [] | [string];
     processorType: [] | [string];
     location: string;
+    vendorName: [] | [string];
     photoId: [] | [_ExternalBlob];
 }> {
     return {
@@ -1278,13 +1279,16 @@ async function to_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<
         purchaseDate: value.purchaseDate ? candid_some(value.purchaseDate) : candid_none(),
         storage: value.storage ? candid_some(value.storage) : candid_none(),
         name: value.name,
+        invoiceNumber: value.invoiceNumber ? candid_some(value.invoiceNumber) : candid_none(),
         serialNumber: value.serialNumber,
         notes: value.notes ? candid_some(value.notes) : candid_none(),
         category: to_candid_AssetCategory_n12(_uploadFile, _downloadFile, value.category),
         warrantyDate: value.warrantyDate ? candid_some(value.warrantyDate) : candid_none(),
         assignedUser: value.assignedUser ? candid_some(value.assignedUser) : candid_none(),
+        assetTag: value.assetTag ? candid_some(value.assetTag) : candid_none(),
         processorType: value.processorType ? candid_some(value.processorType) : candid_none(),
         location: value.location,
+        vendorName: value.vendorName ? candid_some(value.vendorName) : candid_none(),
         photoId: value.photoId ? candid_some(await to_candid_ExternalBlob_n14(_uploadFile, _downloadFile, value.photoId)) : candid_none()
     };
 }

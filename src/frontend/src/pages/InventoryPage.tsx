@@ -374,6 +374,9 @@ export function InventoryPage({
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Warranty
                       </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Notes
+                      </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
                         Actions
                       </TableHead>
@@ -425,6 +428,11 @@ export function InventoryPage({
                           </TableCell>
                           <TableCell>
                             <WarrantyBadge warrantyDate={asset.warrantyDate} />
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[140px]">
+                            <span className="truncate block">
+                              {(asset as any).notes || "—"}
+                            </span>
                           </TableCell>
                           <TableCell
                             className="text-right"

@@ -19,13 +19,16 @@ export interface Asset {
   'storage' : [] | [string],
   'name' : string,
   'createdAt' : Time,
+  'invoiceNumber' : [] | [string],
   'serialNumber' : string,
   'notes' : [] | [string],
   'category' : AssetCategory,
   'warrantyDate' : [] | [string],
   'assignedUser' : [] | [string],
+  'assetTag' : [] | [string],
   'processorType' : [] | [string],
   'location' : string,
+  'vendorName' : [] | [string],
   'photoId' : [] | [ExternalBlob],
 }
 export type AssetCategory = { 'desktop' : null } |
@@ -43,13 +46,16 @@ export interface AssetInput {
   'purchaseDate' : [] | [string],
   'storage' : [] | [string],
   'name' : string,
+  'invoiceNumber' : [] | [string],
   'serialNumber' : string,
   'notes' : [] | [string],
   'category' : AssetCategory,
   'warrantyDate' : [] | [string],
   'assignedUser' : [] | [string],
+  'assetTag' : [] | [string],
   'processorType' : [] | [string],
   'location' : string,
+  'vendorName' : [] | [string],
   'photoId' : [] | [ExternalBlob],
 }
 export type AssetStatus = { 'assigned' : null } |
@@ -71,14 +77,19 @@ export interface AssignmentHistoryEntry {
 export type ExternalBlob = Uint8Array;
 export interface LocalUser {
   'id' : bigint,
+  'accessLevel' : string,
   'employeeCode' : string,
+  'username' : string,
   'name' : string,
   'email' : string,
   'notes' : [] | [string],
   'department' : string,
 }
 export interface LocalUserInput {
+  'accessLevel' : string,
   'employeeCode' : string,
+  'username' : string,
+  'password' : string,
   'name' : string,
   'email' : string,
   'notes' : [] | [string],
@@ -93,26 +104,30 @@ export interface Stats {
 }
 export interface StoreSoftware {
   'id' : bigint,
+  'assignedTo' : [] | [string],
   'purchaseDate' : [] | [string],
   'name' : string,
   'createdAt' : Time,
+  'invoiceNumber' : [] | [string],
   'licenseType' : [] | [string],
   'vendor' : string,
   'notes' : [] | [string],
   'licenseKey' : [] | [string],
+  'assetTag' : [] | [string],
   'licenseExpiry' : [] | [string],
-  'assignedTo' : [] | [string],
 }
 export interface StoreSoftwareInput {
   'id' : [] | [bigint],
+  'assignedTo' : [] | [string],
   'purchaseDate' : [] | [string],
   'name' : string,
+  'invoiceNumber' : [] | [string],
   'licenseType' : [] | [string],
   'vendor' : string,
   'notes' : [] | [string],
   'licenseKey' : [] | [string],
+  'assetTag' : [] | [string],
   'licenseExpiry' : [] | [string],
-  'assignedTo' : [] | [string],
 }
 export type Time = bigint;
 export interface UserProfile { 'name' : string }
@@ -156,17 +171,15 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
   'addLocalUser' : ActorMethod<[LocalUserInput], bigint>,
-  'addLocalUserWithCreds' : ActorMethod<[string, string, LocalUserInput], bigint>,
   'addSoftware' : ActorMethod<[StoreSoftwareInput], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'assignRole' : ActorMethod<[Principal, UserRole], undefined>,
   'bootstrapAdmin' : ActorMethod<[], boolean>,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
   'deleteLocalUser' : ActorMethod<[bigint], undefined>,
-  'deleteLocalUserWithCreds' : ActorMethod<[string, string, bigint], undefined>,
   'deleteSoftware' : ActorMethod<[bigint], undefined>,
   'getAllAssets' : ActorMethod<[], Array<Asset>>,
   'getAllLocalUsers' : ActorMethod<[], Array<LocalUser>>,
-  'getAllLocalUsersWithCreds' : ActorMethod<[string, string], Array<LocalUser>>,
   'getAllSoftware' : ActorMethod<[], Array<StoreSoftware>>,
   'getAllUsersWithRoles' : ActorMethod<[], Array<UserWithRole>>,
   'getAsset' : ActorMethod<[bigint], Asset>,
@@ -177,18 +190,18 @@ export interface _SERVICE {
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getHistory' : ActorMethod<[], Array<AssignmentHistoryEntry>>,
   'getHistoryForAsset' : ActorMethod<[bigint], Array<AssignmentHistoryEntry>>,
-  'getSoftware' : ActorMethod<[bigint], StoreSoftware>,
-  'getSoftwareByVendor' : ActorMethod<[string], Array<StoreSoftware>>,
   'getStats' : ActorMethod<[], Stats>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWarrantyStats' : ActorMethod<[], WarrantyStats>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'loginLocalUser' : ActorMethod<
+    [string, string],
+    [] | [{ 'id' : bigint, 'accessLevel' : string, 'name' : string }]
+  >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,
-  'searchSoftware' : ActorMethod<[string], Array<StoreSoftware>>,
   'updateAsset' : ActorMethod<[bigint, AssetInput], undefined>,
   'updateLocalUser' : ActorMethod<[bigint, LocalUserInput], undefined>,
-  'updateLocalUserWithCreds' : ActorMethod<[string, string, bigint, LocalUserInput], undefined>,
   'updateSoftware' : ActorMethod<[bigint, StoreSoftwareInput], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

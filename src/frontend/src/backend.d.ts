@@ -45,39 +45,36 @@ export interface AssignmentHistoryEntry {
 }
 export interface StoreSoftwareInput {
     id?: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 }
 export interface LocalUser {
     id: bigint;
-    name: string;
-    username: string;
     accessLevel: string;
     employeeCode: string;
+    username: string;
+    name: string;
     email: string;
     notes?: string;
     department: string;
 }
 export interface LocalUserInput {
-    name: string;
-    username: string;
-    password: string;
     accessLevel: string;
     employeeCode: string;
+    username: string;
+    password: string;
+    name: string;
     email: string;
     notes?: string;
     department: string;
-}
-export interface LocalLoginResult {
-    id: bigint;
-    name: string;
-    accessLevel: string;
 }
 export interface AssetInput {
     id?: bigint;
@@ -87,13 +84,16 @@ export interface AssetInput {
     purchaseDate?: string;
     storage?: string;
     name: string;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }
 export interface Asset {
@@ -105,26 +105,31 @@ export interface Asset {
     storage?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     serialNumber: string;
     notes?: string;
     category: AssetCategory;
     warrantyDate?: string;
     assignedUser?: string;
+    assetTag?: string;
     processorType?: string;
     location: string;
+    vendorName?: string;
     photoId?: ExternalBlob;
 }
 export interface StoreSoftware {
     id: bigint;
+    assignedTo?: string;
     purchaseDate?: string;
     name: string;
     createdAt: Time;
+    invoiceNumber?: string;
     licenseType?: string;
     vendor: string;
     notes?: string;
     licenseKey?: string;
+    assetTag?: string;
     licenseExpiry?: string;
-    assignedTo?: string;
 }
 export interface UserProfile {
     name: string;
@@ -153,17 +158,15 @@ export enum UserRole {
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
-    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
     addSoftware(input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    assignRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
     deleteAsset(id: bigint): Promise<void>;
     deleteLocalUser(id: bigint): Promise<void>;
-    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     deleteSoftware(id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
-    getAllLocalUsersWithCreds(adminUsername: string, adminPassword: string): Promise<Array<LocalUser>>;
     getAllSoftware(): Promise<Array<StoreSoftware>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
@@ -174,18 +177,18 @@ export interface backendInterface {
     getCallerUserRole(): Promise<UserRole>;
     getHistory(): Promise<Array<AssignmentHistoryEntry>>;
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
-    getSoftware(id: bigint): Promise<StoreSoftware>;
-    getSoftwareByVendor(vendor: string): Promise<Array<StoreSoftware>>;
     getStats(): Promise<Stats>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
     isCallerAdmin(): Promise<boolean>;
-    loginLocalUser(username: string, password: string): Promise<LocalLoginResult | null>;
+    loginLocalUser(username: string, password: string): Promise<{
+        id: bigint;
+        accessLevel: string;
+        name: string;
+    } | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
-    searchSoftware(term: string): Promise<Array<StoreSoftware>>;
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
-    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
     updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
 }

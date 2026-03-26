@@ -110,7 +110,12 @@ function LicenseBadge({ expiry }: { expiry?: string }) {
   );
 }
 
-const EMPTY_FORM: StoreSoftwareInput = {
+type SoftwareForm = StoreSoftwareInput & {
+  assetTag?: string;
+  invoiceNumber?: string;
+};
+
+const EMPTY_FORM: SoftwareForm = {
   name: "",
   vendor: "",
   purchaseDate: "",
@@ -119,6 +124,8 @@ const EMPTY_FORM: StoreSoftwareInput = {
   licenseKey: "",
   notes: "",
   assignedTo: "",
+  assetTag: "",
+  invoiceNumber: "",
 };
 
 export function SoftwareInventoryPage({ onBack }: Props) {
@@ -133,7 +140,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StoreSoftware | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreSoftware | null>(null);
-  const [form, setForm] = useState<StoreSoftwareInput>(EMPTY_FORM);
+  const [form, setForm] = useState<SoftwareForm>(EMPTY_FORM);
 
   const filtered = useMemo(() => {
     if (!software) return [];
@@ -166,6 +173,8 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       licenseKey: s.licenseKey ?? "",
       notes: s.notes ?? "",
       assignedTo: s.assignedTo ?? "",
+      assetTag: (s as any).assetTag ?? "",
+      invoiceNumber: (s as any).invoiceNumber ?? "",
     });
     setModalOpen(true);
   };
@@ -184,7 +193,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       licenseKey: form.licenseKey || undefined,
       notes: form.notes || undefined,
       assignedTo: form.assignedTo || undefined,
-    };
+      ...(form.assetTag ? { assetTag: form.assetTag } : {}),
+      ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
+    } as StoreSoftwareInput;
     try {
       if (editTarget) {
         await updateSoftware.mutateAsync({ id: editTarget.id, input });
@@ -340,10 +351,10 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                       style={{ backgroundColor: "oklch(var(--muted) / 0.5)" }}
                     >
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Software Name
+                        Asset Tag
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Vendor
+                        Software Name
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Date of Purchase
@@ -361,10 +372,16 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                         License Key
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Notes
+                        Assigned To
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Assigned To
+                        Vendor
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Invoice No.
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Notes
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
                         Actions
@@ -380,11 +397,11 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                           className="hover:bg-muted/30 transition-colors"
                           data-ocid={`software.item.${rowIdx}`}
                         >
+                          <TableCell className="text-sm text-muted-foreground">
+                            {(sw as any).assetTag || "—"}
+                          </TableCell>
                           <TableCell className="font-medium text-sm">
                             {sw.name}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {sw.vendor}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {sw.purchaseDate || "—"}
@@ -407,13 +424,19 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                               "—"
                             )}
                           </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {sw.assignedTo || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {sw.vendor}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {(sw as any).invoiceNumber || "—"}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[140px]">
                             <span className="truncate block">
                               {sw.notes || "—"}
                             </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {sw.assignedTo || "—"}
                           </TableCell>
                           <TableCell
                             className="text-right"
@@ -524,6 +547,19 @@ export function SoftwareInventoryPage({ onBack }: Props) {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
+            {/* Asset Tag — first field */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="sw-asset-tag">Asset Tag</Label>
+              <Input
+                id="sw-asset-tag"
+                value={form.assetTag ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, assetTag: e.target.value }))
+                }
+                placeholder="e.g. SW-001"
+                data-ocid="software.input"
+              />
+            </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sw-name">
                 Software Name <span className="text-destructive">*</span>
@@ -535,20 +571,6 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                   setForm((f) => ({ ...f, name: e.target.value }))
                 }
                 placeholder="e.g. Microsoft Office 365"
-                data-ocid="software.input"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="sw-vendor">
-                Vendor <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="sw-vendor"
-                value={form.vendor}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, vendor: e.target.value }))
-                }
-                placeholder="e.g. Microsoft"
                 data-ocid="software.input"
               />
             </div>
@@ -604,6 +626,47 @@ export function SoftwareInventoryPage({ onBack }: Props) {
               />
             </div>
             <div className="grid gap-1.5">
+              <Label htmlFor="sw-assigned-to">Assigned To</Label>
+              <Input
+                id="sw-assigned-to"
+                value={form.assignedTo ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, assignedTo: e.target.value }))
+                }
+                placeholder="e.g. John Smith or EMP001"
+                data-ocid="software.input"
+              />
+            </div>
+            {/* Vendor & Invoice — last fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sw-vendor">
+                  Vendor <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="sw-vendor"
+                  value={form.vendor}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, vendor: e.target.value }))
+                  }
+                  placeholder="e.g. Microsoft"
+                  data-ocid="software.input"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sw-invoice">Invoice Number</Label>
+                <Input
+                  id="sw-invoice"
+                  value={form.invoiceNumber ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, invoiceNumber: e.target.value }))
+                  }
+                  placeholder="e.g. INV-2024-0001"
+                  data-ocid="software.input"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
               <Label htmlFor="sw-notes">Notes</Label>
               <Textarea
                 id="sw-notes"
@@ -614,18 +677,6 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                 placeholder="Any additional notes..."
                 rows={3}
                 data-ocid="software.textarea"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="sw-assigned-to">Assigned To</Label>
-              <Input
-                id="sw-assigned-to"
-                value={form.assignedTo ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, assignedTo: e.target.value }))
-                }
-                placeholder="e.g. John Smith or EMP001"
-                data-ocid="software.input"
               />
             </div>
           </div>

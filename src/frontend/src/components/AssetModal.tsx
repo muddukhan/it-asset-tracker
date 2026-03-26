@@ -53,6 +53,9 @@ type FormState = {
   processorType: string;
   ram: string;
   storage: string;
+  assetTag: string;
+  vendorName: string;
+  invoiceNumber: string;
 };
 
 const defaultForm: FormState = {
@@ -69,6 +72,9 @@ const defaultForm: FormState = {
   processorType: "",
   ram: "",
   storage: "",
+  assetTag: "",
+  vendorName: "",
+  invoiceNumber: "",
 };
 
 export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
@@ -97,6 +103,9 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
         processorType: asset.processorType ?? "",
         ram: asset.ram ?? "",
         storage: asset.storage ?? "",
+        assetTag: (asset as any).assetTag ?? "",
+        vendorName: (asset as any).vendorName ?? "",
+        invoiceNumber: (asset as any).invoiceNumber ?? "",
       });
       setExistingPhotoUrl(asset.photoId ? asset.photoId.getDirectURL() : null);
     } else {
@@ -162,7 +171,10 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
       ram: form.ram || undefined,
       storage: form.storage || undefined,
       photoId,
-    };
+      ...(form.assetTag ? { assetTag: form.assetTag } : {}),
+      ...(form.vendorName ? { vendorName: form.vendorName } : {}),
+      ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
+    } as AssetInput;
     try {
       if (asset) {
         await updateAsset.mutateAsync({ id: asset.id, input });
@@ -270,6 +282,18 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            {/* Asset Tag — first field */}
+            <div className="space-y-1.5 col-span-2">
+              <Label htmlFor="assetTag">Asset Tag</Label>
+              <Input
+                id="assetTag"
+                value={form.assetTag}
+                onChange={(e) => set("assetTag")(e.target.value)}
+                placeholder="e.g. ASSET-001"
+                data-ocid="asset.input"
+              />
+            </div>
+
             <div className="space-y-1.5 col-span-2">
               <Label htmlFor="name">Asset Name *</Label>
               <Input
@@ -281,7 +305,7 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 data-ocid="asset.input"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 col-span-2">
               <Label htmlFor="serial">Serial Number *</Label>
               <Input
                 id="serial"
@@ -369,7 +393,7 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 data-ocid="asset.input"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 col-span-2">
               <Label htmlFor="warrantyDate">Warranty Expiry Date</Label>
               <Input
                 id="warrantyDate"
@@ -377,17 +401,6 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 value={form.warrantyDate}
                 onChange={(e) => set("warrantyDate")(e.target.value)}
                 data-ocid="asset.input"
-              />
-            </div>
-            <div className="space-y-1.5 col-span-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={form.notes}
-                onChange={(e) => set("notes")(e.target.value)}
-                placeholder="Any additional notes..."
-                rows={3}
-                data-ocid="asset.textarea"
               />
             </div>
           </div>
@@ -449,6 +462,51 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Vendor & Invoice — last fields */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Separator className="flex-1" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2">
+                Purchase Details
+              </span>
+              <Separator className="flex-1" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="vendorName">Vendor Name</Label>
+                <Input
+                  id="vendorName"
+                  value={form.vendorName}
+                  onChange={(e) => set("vendorName")(e.target.value)}
+                  placeholder="e.g. Dell Technologies"
+                  data-ocid="asset.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invoiceNumber">Invoice Number</Label>
+                <Input
+                  id="invoiceNumber"
+                  value={form.invoiceNumber}
+                  onChange={(e) => set("invoiceNumber")(e.target.value)}
+                  placeholder="e.g. INV-2024-0001"
+                  data-ocid="asset.input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={form.notes}
+              onChange={(e) => set("notes")(e.target.value)}
+              placeholder="Any additional notes..."
+              rows={3}
+              data-ocid="asset.textarea"
+            />
           </div>
 
           <DialogFooter>
