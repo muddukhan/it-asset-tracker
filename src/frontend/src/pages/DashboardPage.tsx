@@ -154,6 +154,7 @@ const THEMES: { id: DashboardTheme; label: string; color: string }[] = [
   { id: "forest-green", label: "Forest Green", color: "#2d6a4f" },
   { id: "sunset-orange", label: "Sunset Orange", color: "#c05621" },
   { id: "purple-haze", label: "Purple Haze", color: "#6b3fa0" },
+  { id: "royal-crimson", label: "Royal Crimson", color: "#c0253a" },
 ];
 
 const VIEW_MODES: { id: ViewMode; label: string; icon: React.ReactNode }[] = [

@@ -5,7 +5,8 @@ export type DashboardTheme =
   | "ocean-dark"
   | "forest-green"
   | "sunset-orange"
-  | "purple-haze";
+  | "purple-haze"
+  | "royal-crimson";
 
 export type ViewMode = "compact" | "comfortable" | "wide";
 
