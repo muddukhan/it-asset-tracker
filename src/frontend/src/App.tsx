@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import {
   InternetIdentityProvider,
   useInternetIdentity,
@@ -96,6 +97,7 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
 
 function AppShell() {
   const { identity, clear, isInitializing } = useInternetIdentity();
+  const { currentTheme } = useTheme();
   const [localSession, setLocalSession] = useState<LocalSession | null>(
     loadLocalSession,
   );
@@ -200,7 +202,11 @@ function AppShell() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div
+      id="app-root"
+      className="min-h-screen flex flex-col bg-background"
+      data-theme={currentTheme === "blue-steel" ? undefined : currentTheme}
+    >
       {/* Top Navbar */}
       <header
         className="h-14 flex items-center px-4 gap-4 fixed top-0 left-0 right-0 z-40 shadow-sm"
@@ -280,7 +286,9 @@ function AppShell() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-sm font-medium hidden md:block">
-                  {isLocalUser ? displayName : `${displayName.slice(0, 8)}…`}
+                  {isLocalUser
+                    ? displayName
+                    : `${displayName.slice(0, 8)}\u2026`}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -369,7 +377,7 @@ function AppShell() {
               className="text-xs"
               style={{ color: "oklch(var(--sidebar-foreground) / 0.4)" }}
             >
-              © {new Date().getFullYear()}{" "}
+              &copy; {new Date().getFullYear()}{" "}
               <a
                 href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
                 target="_blank"
@@ -394,8 +402,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <InternetIdentityProvider>
-        <AppShell />
-        <Toaster richColors position="top-right" />
+        <ThemeProvider>
+          <AppShell />
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </InternetIdentityProvider>
     </QueryClientProvider>
   );

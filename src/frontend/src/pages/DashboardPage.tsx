@@ -1,18 +1,28 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
+  AlignJustify,
   Archive,
   BarChart3,
+  Check,
   CheckCircle2,
   Clock,
   Cpu,
   HardDrive,
   Laptop,
+  LayoutGrid,
+  Maximize2,
   MemoryStick,
   Monitor,
   Package,
+  Palette,
   Printer,
   Server,
   ShieldAlert,
@@ -22,6 +32,11 @@ import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { AssetCategory, AssetStatus } from "../backend";
 import { StatusBadge } from "../components/StatusBadge";
+import {
+  type DashboardTheme,
+  type ViewMode,
+  useTheme,
+} from "../context/ThemeContext";
 import { useGetAllAssets, useGetStats } from "../hooks/useQueries";
 import { useGetAllSoftware } from "../hooks/useSoftwareQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
@@ -56,9 +71,9 @@ type AgeBucket = {
 
 const AGE_BUCKETS_TEMPLATE: Omit<AgeBucket, "count">[] = [
   { key: "lt1", label: "Under 1 Year" },
-  { key: "1to2", label: "1–2 Years" },
-  { key: "2to3", label: "2–3 Years" },
-  { key: "3to5", label: "3–5 Years" },
+  { key: "1to2", label: "1\u20132 Years" },
+  { key: "2to3", label: "2\u20133 Years" },
+  { key: "3to5", label: "3\u20135 Years" },
   { key: "gt5", label: "5+ Years" },
   { key: "unknown", label: "Unknown" },
 ];
@@ -133,6 +148,40 @@ function StatCard({
   );
 }
 
+const THEMES: { id: DashboardTheme; label: string; color: string }[] = [
+  { id: "blue-steel", label: "Blue Steel", color: "#3a6ea5" },
+  { id: "ocean-dark", label: "Ocean Dark", color: "#1a2a4a" },
+  { id: "forest-green", label: "Forest Green", color: "#2d6a4f" },
+  { id: "sunset-orange", label: "Sunset Orange", color: "#c05621" },
+  { id: "purple-haze", label: "Purple Haze", color: "#6b3fa0" },
+];
+
+const VIEW_MODES: { id: ViewMode; label: string; icon: React.ReactNode }[] = [
+  {
+    id: "compact",
+    label: "Compact",
+    icon: <AlignJustify className="h-4 w-4" />,
+  },
+  {
+    id: "comfortable",
+    label: "Comfortable",
+    icon: <LayoutGrid className="h-4 w-4" />,
+  },
+  { id: "wide", label: "Wide", icon: <Maximize2 className="h-4 w-4" /> },
+];
+
+const STAT_GRID: Record<ViewMode, string> = {
+  compact: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3",
+  comfortable: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4",
+  wide: "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
+};
+
+const PANELS_GRID: Record<ViewMode, string> = {
+  compact: "grid grid-cols-1 lg:grid-cols-3 gap-3",
+  comfortable: "grid grid-cols-1 lg:grid-cols-2 gap-6",
+  wide: "grid grid-cols-1 xl:grid-cols-2 gap-6",
+};
+
 type Props = { onNavigate?: (page: string, filter?: string) => void };
 
 export function DashboardPage({ onNavigate }: Props) {
@@ -140,6 +189,7 @@ export function DashboardPage({ onNavigate }: Props) {
   const { data: stats, isLoading: statsLoading } = useGetStats();
   const { data: softwareList, isLoading: softwareLoading } =
     useGetAllSoftware();
+  const { currentTheme, setTheme, viewMode, setViewMode } = useTheme();
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -318,14 +368,98 @@ export function DashboardPage({ onNavigate }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm mt-0.5 text-muted-foreground">{today}</p>
+      {/* Header row with title + theme/view toolbar */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm mt-0.5 text-muted-foreground">{today}</p>
+        </div>
+
+        {/* Theme & View toolbar */}
+        <div className="flex items-center gap-2" data-ocid="dashboard.panel">
+          {/* Theme picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                data-ocid="dashboard.open_modal_button"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                Theme
+                <span
+                  className="w-3 h-3 rounded-full border border-border ml-0.5"
+                  style={{
+                    backgroundColor:
+                      THEMES.find((t) => t.id === currentTheme)?.color ??
+                      "#3a6ea5",
+                  }}
+                />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-52 p-3"
+              data-ocid="dashboard.popover"
+            >
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                Dashboard Theme
+              </p>
+              <div className="flex flex-col gap-1">
+                {THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setTheme(theme.id)}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors w-full text-left ${
+                      currentTheme === theme.id
+                        ? "bg-accent/10 text-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    data-ocid="dashboard.toggle"
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full flex-shrink-0 border border-border/60"
+                      style={{ backgroundColor: theme.color }}
+                    />
+                    <span className="flex-1 text-sm">{theme.label}</span>
+                    {currentTheme === theme.id && (
+                      <Check className="h-3.5 w-3.5 text-accent" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* View mode toggle */}
+          <div
+            className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5"
+            aria-label="View mode"
+          >
+            {VIEW_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                title={mode.label}
+                onClick={() => setViewMode(mode.id)}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === mode.id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-ocid="dashboard.toggle"
+              >
+                {mode.icon}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className={STAT_GRID[viewMode]}>
         {statsLoading || assetsLoading || softwareLoading ? (
           STAT_SKELETONS.map((k) => (
             <Skeleton key={k} className="h-24 rounded-xl" />
@@ -422,7 +556,7 @@ export function DashboardPage({ onNavigate }: Props) {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={PANELS_GRID[viewMode]}>
         {/* Warranty alerts */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -822,7 +956,7 @@ export function DashboardPage({ onNavigate }: Props) {
                     <p className="text-xs text-muted-foreground">
                       {sw.vendor && <span>{sw.vendor}</span>}
                       {expiryDate && (
-                        <span className={sw.vendor ? " · " : ""}>
+                        <span className={sw.vendor ? " \u00b7 " : ""}>
                           Expires: {expiryDate.toLocaleDateString()}
                         </span>
                       )}
@@ -929,7 +1063,7 @@ export function DashboardPage({ onNavigate }: Props) {
         )}
       </motion.div>
 
-      {/* Asset Age by Category panel (replaces Laptop Age Distribution) */}
+      {/* Asset Age by Category panel */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
