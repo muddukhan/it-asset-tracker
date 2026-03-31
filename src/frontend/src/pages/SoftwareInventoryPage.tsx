@@ -560,6 +560,19 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                 data-ocid="software.input"
               />
             </div>
+            {/* Assigned To — after Asset Tag, before Software Name */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="sw-assigned-to">Assigned To</Label>
+              <Input
+                id="sw-assigned-to"
+                value={form.assignedTo ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, assignedTo: e.target.value }))
+                }
+                placeholder="e.g. John Smith or EMP001"
+                data-ocid="software.input"
+              />
+            </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sw-name">
                 Software Name <span className="text-destructive">*</span>
@@ -622,18 +635,6 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                 }
                 placeholder="e.g. XXXXX-XXXXX-XXXXX"
                 className="font-mono text-sm"
-                data-ocid="software.input"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="sw-assigned-to">Assigned To</Label>
-              <Input
-                id="sw-assigned-to"
-                value={form.assignedTo ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, assignedTo: e.target.value }))
-                }
-                placeholder="e.g. John Smith or EMP001"
                 data-ocid="software.input"
               />
             </div>

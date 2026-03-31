@@ -42,7 +42,8 @@ module {
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
       case (null) {
-        Runtime.trap("User is not registered");
+        // Default to guest instead of trapping — prevents crashes for unregistered users
+        #guest
       };
     };
   };

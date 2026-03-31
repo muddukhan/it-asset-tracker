@@ -30,16 +30,18 @@ export function LoginPage({
     setLocalLoading(true);
     try {
       const actor = await createActorWithConfig();
-      const result = await (actor as any).loginLocalUser(
+      // loginLocalUser returns Candid optional: [] | [{ id, name, accessLevel }]
+      const result = (await (actor as any).loginLocalUser(
         username.trim(),
         password,
-      );
-      if (result === null || result === undefined) {
+      )) as Array<{ id: bigint; name: string; accessLevel: string }>;
+      if (!result || result.length === 0) {
         setLocalError("Invalid username or password");
       } else {
+        const user = result[0];
         const session: LocalSession = {
-          name: result.name,
-          accessLevel: result.accessLevel,
+          name: user.name,
+          accessLevel: user.accessLevel,
           username: username.trim(),
           password: password,
         };

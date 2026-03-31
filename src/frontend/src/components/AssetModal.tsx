@@ -294,6 +294,30 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
               />
             </div>
 
+            {/* Employee Code — between Asset Tag and Asset Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="employeeCode">Employee Code</Label>
+              <Input
+                id="employeeCode"
+                value={form.employeeCode}
+                onChange={(e) => set("employeeCode")(e.target.value)}
+                placeholder="e.g. EMP-001"
+                data-ocid="asset.input"
+              />
+            </div>
+
+            {/* Employee Name (Assigned User) — after Employee Code */}
+            <div className="space-y-1.5">
+              <Label htmlFor="assignedUser">Employee Name</Label>
+              <Input
+                id="assignedUser"
+                value={form.assignedUser}
+                onChange={(e) => set("assignedUser")(e.target.value)}
+                placeholder="e.g. John Doe"
+                data-ocid="asset.input"
+              />
+            </div>
+
             <div className="space-y-1.5 col-span-2">
               <Label htmlFor="name">Asset Name *</Label>
               <Input
@@ -360,26 +384,6 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 onChange={(e) => set("location")(e.target.value)}
                 placeholder="e.g. HQ Floor 2"
                 required
-                data-ocid="asset.input"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="assignedUser">Assigned User</Label>
-              <Input
-                id="assignedUser"
-                value={form.assignedUser}
-                onChange={(e) => set("assignedUser")(e.target.value)}
-                placeholder="e.g. john.doe@company.com"
-                data-ocid="asset.input"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="employeeCode">Employee Code</Label>
-              <Input
-                id="employeeCode"
-                value={form.employeeCode}
-                onChange={(e) => set("employeeCode")(e.target.value)}
-                placeholder="e.g. EMP-001"
                 data-ocid="asset.input"
               />
             </div>

@@ -1,27 +1,25 @@
-# Brandscapes Assets - Dashboard Theme & View Options
+# Brandscapes Assets
 
 ## Current State
-The dashboard has a fixed blue/dark theme defined in index.css CSS variables. There are no user-facing theme or layout options. The layout is a fixed multi-panel grid.
+Full IT asset tracker with hardware/software inventory, admin role management, local user authentication, dashboard analytics, and CSV export. The backend had no stable variables — all state (admin assignments, local users, assets) was wiped on every deployment.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Theme switcher: 5 preset themes (Blue Steel (default), Ocean Dark, Forest Green, Sunset Orange, Purple Haze)
-- View mode switcher: Compact, Comfortable, Wide layouts for dashboard panels
-- Settings persist to localStorage so they survive page refresh
-- Theme picker and view switcher accessible from a toolbar on the Dashboard page header
+- Stable variables for all persistent data: admin role assignment, local users, assets, software, history, counters
+- Proper `preupgrade()` hook to serialize all state before upgrade
+- Proper `postupgrade()` hook to restore state after upgrade (with sample data seeding only on first-ever run)
 
 ### Modify
-- DashboardPage.tsx: Add a theme/view toolbar at the top with palette and layout icons, apply view classes to panel grid
-- index.css: Add theme CSS variable overrides for each theme as data-theme attributes on :root
-- App.tsx or a new ThemeContext: Inject data-theme on the root element when theme changes
+- `getUserRole` in access-control.mo: return `#guest` for unregistered principals instead of trapping with `Runtime.trap`. This prevents crashes when checking admin status for new users.
+- `bootstrapAdmin` now works reliably since `isCallerAdmin` no longer traps for unregistered users.
 
 ### Remove
-- Nothing removed
+- Empty `preupgrade()` stub
+- Simple `postupgrade()` that only checked if initialized
 
 ## Implementation Plan
-1. Create a ThemeContext (src/frontend/src/context/ThemeContext.tsx) exposing currentTheme, setTheme, viewMode, setViewMode with localStorage persistence
-2. Add 5 theme definitions as CSS variable overrides in index.css using [data-theme="..."] selectors
-3. In App.tsx, wrap with ThemeProvider and apply data-theme attribute to root div
-4. In DashboardPage.tsx, add a toolbar row at the top with Palette icon button opening a theme picker popover, and a Layout icon toggle for view modes (compact/comfortable/wide)
-5. Apply view mode classes to the stats grid and panels grid
+1. Update `access-control.mo`: change `getUserRole` null case to return `#guest` instead of `Runtime.trap`
+2. Add 20 stable variables in `main.mo` covering all persistent data
+3. Implement full `preupgrade()` that saves all map entries to stable arrays
+4. Implement full `postupgrade()` that restores all data and only seeds samples on first run

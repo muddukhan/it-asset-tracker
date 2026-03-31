@@ -257,6 +257,27 @@ actor {
     };
   };
 
+  // Stable variables — persisted across upgrades
+  stable var stableAdminAssigned : Bool = false;
+  stable var stableUserRoles : [(Principal.Principal, AccessControl.UserRole)] = [];
+  stable var stableNextAssetId : Nat = 1;
+  stable var stableNextHistoryId : Nat = 1;
+  stable var stableNextLocalUserId : Nat = 1;
+  stable var stableNextSoftwareId : Nat = 1;
+  stable var stableAssets : [(Nat, StoreAsset)] = [];
+  stable var stableHistory : [(Nat, StoreAssignmentHistoryEntry)] = [];
+  stable var stableLocalUsers : [(Nat, StoreLocalUser)] = [];
+  stable var stableLocalUserCredentials : [(Nat, StoreLocalUserCredentials)] = [];
+  stable var stableAssetEmployeeCodes : [(Nat, Text)] = [];
+  stable var stableSoftwareInventory : [(Nat, StoreSoftwareRecord)] = [];
+  stable var stableSoftwareAssignedTo : [(Nat, Text)] = [];
+  stable var stableAssetTags : [(Nat, Text)] = [];
+  stable var stableAssetVendorNames : [(Nat, Text)] = [];
+  stable var stableAssetInvoiceNumbers : [(Nat, Text)] = [];
+  stable var stableSoftwareAssetTags : [(Nat, Text)] = [];
+  stable var stableSoftwareInvoiceNumbers : [(Nat, Text)] = [];
+  stable var stableDataSaved : Bool = false;
+
   var nextAssetId = 1;
   var nextHistoryId = 1;
   var nextLocalUserId = 1;
@@ -352,13 +373,78 @@ actor {
     };
   };
 
-  system func preupgrade() {};
+  system func preupgrade() {
+    // Save all state to stable variables
+    stableAdminAssigned := accessControlState.adminAssigned;
+    stableUserRoles := accessControlState.userRoles.entries().toArray();
+    stableNextAssetId := nextAssetId;
+    stableNextHistoryId := nextHistoryId;
+    stableNextLocalUserId := nextLocalUserId;
+    stableNextSoftwareId := nextSoftwareId;
+    stableAssets := assets.entries().toArray();
+    stableHistory := history.entries().toArray();
+    stableLocalUsers := localUsers.entries().toArray();
+    stableLocalUserCredentials := localUserCredentials.entries().toArray();
+    stableAssetEmployeeCodes := assetEmployeeCodes.entries().toArray();
+    stableSoftwareInventory := softwareInventory.entries().toArray();
+    stableSoftwareAssignedTo := softwareAssignedTo.entries().toArray();
+    stableAssetTags := assetTags.entries().toArray();
+    stableAssetVendorNames := assetVendorNames.entries().toArray();
+    stableAssetInvoiceNumbers := assetInvoiceNumbers.entries().toArray();
+    stableSoftwareAssetTags := softwareAssetTags.entries().toArray();
+    stableSoftwareInvoiceNumbers := softwareInvoiceNumbers.entries().toArray();
+    stableDataSaved := not initialized.isEmpty();
+  };
+
   system func postupgrade() {
-    if (initialized.isEmpty()) {
+    // Restore admin state
+    accessControlState.adminAssigned := stableAdminAssigned;
+    for ((p, r) in stableUserRoles.vals()) {
+      accessControlState.userRoles.add(p, r);
+    };
+    stableUserRoles := [];
+
+    // Restore counters
+    if (stableNextAssetId > 1) { nextAssetId := stableNextAssetId };
+    if (stableNextHistoryId > 1) { nextHistoryId := stableNextHistoryId };
+    if (stableNextLocalUserId > 1) { nextLocalUserId := stableNextLocalUserId };
+    if (stableNextSoftwareId > 1) { nextSoftwareId := stableNextSoftwareId };
+
+    // Restore assets and related maps
+    for ((k, v) in stableAssets.vals()) { assets.add(k, v) };
+    stableAssets := [];
+    for ((k, v) in stableHistory.vals()) { history.add(k, v) };
+    stableHistory := [];
+    for ((k, v) in stableLocalUsers.vals()) { localUsers.add(k, v) };
+    stableLocalUsers := [];
+    for ((k, v) in stableLocalUserCredentials.vals()) { localUserCredentials.add(k, v) };
+    stableLocalUserCredentials := [];
+    for ((k, v) in stableAssetEmployeeCodes.vals()) { assetEmployeeCodes.add(k, v) };
+    stableAssetEmployeeCodes := [];
+    for ((k, v) in stableSoftwareInventory.vals()) { softwareInventory.add(k, v) };
+    stableSoftwareInventory := [];
+    for ((k, v) in stableSoftwareAssignedTo.vals()) { softwareAssignedTo.add(k, v) };
+    stableSoftwareAssignedTo := [];
+    for ((k, v) in stableAssetTags.vals()) { assetTags.add(k, v) };
+    stableAssetTags := [];
+    for ((k, v) in stableAssetVendorNames.vals()) { assetVendorNames.add(k, v) };
+    stableAssetVendorNames := [];
+    for ((k, v) in stableAssetInvoiceNumbers.vals()) { assetInvoiceNumbers.add(k, v) };
+    stableAssetInvoiceNumbers := [];
+    for ((k, v) in stableSoftwareAssetTags.vals()) { softwareAssetTags.add(k, v) };
+    stableSoftwareAssetTags := [];
+    for ((k, v) in stableSoftwareInvoiceNumbers.vals()) { softwareInvoiceNumbers.add(k, v) };
+    stableSoftwareInvoiceNumbers := [];
+
+    // Only seed sample data on first-ever run (not on upgrades)
+    if (not stableDataSaved and initialized.isEmpty()) {
       addSampleAssets();
       addSampleSoftware();
       initialized.add(0);
+    } else if (stableDataSaved) {
+      initialized.add(0); // mark as initialized to prevent future seeding
     };
+    stableDataSaved := false;
   };
 
   func addSampleSoftware() {
