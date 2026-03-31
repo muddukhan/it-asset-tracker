@@ -191,4 +191,17 @@ export interface backendInterface {
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
     updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
+    addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
+    updateAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: AssetInput): Promise<void>;
+    deleteAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint>;
+    updateSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: StoreSoftwareInput): Promise<void>;
+    deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
+    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
+    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean>;
+    selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean>;
+    createFirstLocalUser(input: LocalUserInput): Promise<{ ok: bigint } | { err: string }>;
+    hasLocalUsers(): Promise<boolean>;
 }

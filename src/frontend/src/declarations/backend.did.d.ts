@@ -203,6 +203,19 @@ export interface _SERVICE {
   'updateAsset' : ActorMethod<[bigint, AssetInput], undefined>,
   'updateLocalUser' : ActorMethod<[bigint, LocalUserInput], undefined>,
   'updateSoftware' : ActorMethod<[bigint, StoreSoftwareInput], undefined>,
+  'addAssetWithCreds' : ActorMethod<[string, string, AssetInput], bigint>,
+  'updateAssetWithCreds' : ActorMethod<[string, string, bigint, AssetInput], undefined>,
+  'deleteAssetWithCreds' : ActorMethod<[string, string, bigint], undefined>,
+  'addSoftwareWithCreds' : ActorMethod<[string, string, StoreSoftwareInput], bigint>,
+  'updateSoftwareWithCreds' : ActorMethod<[string, string, bigint, StoreSoftwareInput], undefined>,
+  'deleteSoftwareWithCreds' : ActorMethod<[string, string, bigint], undefined>,
+  'addLocalUserWithCreds' : ActorMethod<[string, string, LocalUserInput], bigint>,
+  'updateLocalUserWithCreds' : ActorMethod<[string, string, bigint, LocalUserInput], undefined>,
+  'deleteLocalUserWithCreds' : ActorMethod<[string, string, bigint], undefined>,
+  'isAdminWithCreds' : ActorMethod<[string, string], boolean>,
+  'createFirstLocalUser' : ActorMethod<[LocalUserInput], { 'ok' : bigint } | { 'err' : string }>,
+  'hasLocalUsers' : ActorMethod<[], boolean>,
+  'selfRegisterLocalUser' : ActorMethod<[string, string, string, string], { 'ok' : bigint } | { 'alreadyExists' : null }>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

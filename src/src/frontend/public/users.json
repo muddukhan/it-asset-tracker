@@ -1,0 +1,7 @@
+{
+  "users": [
+    { "userId": "admin", "password": "Admin@123", "name": "Administrator", "accessLevel": "admin" },
+    { "userId": "user1", "password": "User@123", "name": "John Doe", "accessLevel": "readwrite" },
+    { "userId": "viewer", "password": "View@123", "name": "Jane Smith", "accessLevel": "guest" }
+  ]
+}

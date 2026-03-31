@@ -10,6 +10,10 @@ import type {
   UserRole,
   UserWithRole,
 } from "../backend";
+import {
+  useLocalAdminCreds,
+  useLocalSession,
+} from "../context/LocalSessionContext";
 import { useActor } from "./useActor";
 
 export function useGetAllAssets() {
@@ -85,17 +89,26 @@ export function useGetHistoryForAsset(assetId: bigint | null) {
 
 export function useIsCallerAdmin() {
   const { actor, isFetching } = useActor();
+  const localAdminCreds = useLocalAdminCreds();
+  const localSession = useLocalSession();
   return useQuery<boolean>({
-    queryKey: ["isAdmin"],
+    queryKey: ["isAdmin", localAdminCreds?.username],
     queryFn: async () => {
+      if (localSession?.accessLevel === "admin") return true;
       if (!actor) return false;
       try {
+        if (localAdminCreds) {
+          return await actor.isAdminWithCreds(
+            localAdminCreds.username,
+            localAdminCreds.password,
+          );
+        }
         return await actor.isCallerAdmin();
       } catch {
         return false;
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: (!!actor && !isFetching) || localSession?.accessLevel === "admin",
   });
 }
 
@@ -157,9 +170,16 @@ export function useGetAllUsersWithRoles(isAdmin: boolean) {
 export function useAddAsset() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async (input: AssetInput) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.addAssetWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          input,
+        );
       return actor.addAsset(input);
     },
     onSuccess: () => {
@@ -172,9 +192,17 @@ export function useAddAsset() {
 export function useUpdateAsset() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async ({ id, input }: { id: bigint; input: AssetInput }) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.updateAssetWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          id,
+          input,
+        );
       return actor.updateAsset(id, input);
     },
     onSuccess: () => {
@@ -187,9 +215,16 @@ export function useUpdateAsset() {
 export function useDeleteAsset() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.deleteAssetWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          id,
+        );
       return actor.deleteAsset(id);
     },
     onSuccess: () => {
@@ -214,9 +249,16 @@ export function useGetAllLocalUsers() {
 export function useAddLocalUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async (input: LocalUserInput) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.addLocalUserWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          input,
+        );
       return actor.addLocalUser(input);
     },
     onSuccess: () => {
@@ -228,12 +270,20 @@ export function useAddLocalUser() {
 export function useUpdateLocalUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async ({
       id,
       input,
     }: { id: bigint; input: LocalUserInput }) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.updateLocalUserWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          id,
+          input,
+        );
       return actor.updateLocalUser(id, input);
     },
     onSuccess: () => {
@@ -245,9 +295,16 @@ export function useUpdateLocalUser() {
 export function useDeleteLocalUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
+  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Not connected");
+      if (localAdminCreds)
+        return actor.deleteLocalUserWithCreds(
+          localAdminCreds.username,
+          localAdminCreds.password,
+          id,
+        );
       return actor.deleteLocalUser(id);
     },
     onSuccess: () => {

@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2, Lock, Shield, User } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  FileJson,
+  Loader2,
+  Lock,
+  Shield,
+  User,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import type { LocalSession } from "../App";
@@ -29,15 +37,14 @@ export function LoginPage({
     setLocalError("");
     setLocalLoading(true);
     try {
+      // 1. Try backend first
       const actor = await createActorWithConfig();
-      // loginLocalUser returns Candid optional: [] | [{ id, name, accessLevel }]
       const result = (await (actor as any).loginLocalUser(
         username.trim(),
         password,
       )) as Array<{ id: bigint; name: string; accessLevel: string }>;
-      if (!result || result.length === 0) {
-        setLocalError("Invalid username or password");
-      } else {
+
+      if (result && result.length > 0) {
         const user = result[0];
         const session: LocalSession = {
           name: user.name,
@@ -47,13 +54,63 @@ export function LoginPage({
         };
         localStorage.setItem("localUserSession", JSON.stringify(session));
         onLocalLogin(session);
+        return;
       }
     } catch {
-      setLocalError("Login failed. Please try again.");
-    } finally {
-      setLocalLoading(false);
+      // backend failed — fall through to JSON fallback
     }
+
+    // 2. JSON fallback
+    try {
+      const res = await fetch("/users.json");
+      if (res.ok) {
+        const data = (await res.json()) as {
+          users: Array<{
+            userId: string;
+            password: string;
+            name: string;
+            accessLevel: string;
+          }>;
+        };
+        const match = data.users.find(
+          (u) => u.userId === username.trim() && u.password === password,
+        );
+        if (match) {
+          const session: LocalSession = {
+            name: match.name,
+            accessLevel: match.accessLevel,
+            username: match.userId,
+            password: password,
+          };
+          localStorage.setItem("localUserSession", JSON.stringify(session));
+          // Sync to backend so credential-based mutations work
+          try {
+            const actor = await createActorWithConfig();
+            await (actor as any).selfRegisterLocalUser(
+              match.userId,
+              match.password,
+              match.name,
+              match.accessLevel,
+            );
+          } catch {
+            // ignore - UI access level is trusted from session
+          }
+          onLocalLogin(session);
+          return;
+        }
+      }
+    } catch {
+      // JSON fetch failed
+    }
+
+    setLocalError("Invalid username or password");
+    setLocalLoading(false);
   };
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "ii", label: "Internet Identity" },
+    { id: "local", label: "Local User" },
+  ];
 
   return (
     <div
@@ -100,33 +157,24 @@ export function LoginPage({
             className="w-full flex rounded-lg p-1 gap-1"
             style={{ backgroundColor: "oklch(var(--muted))" }}
           >
-            <button
-              type="button"
-              onClick={() => setTab("ii")}
-              className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "ii"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-ocid="login.tab"
-            >
-              Internet Identity
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("local")}
-              className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "local"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-ocid="login.tab"
-            >
-              Local User
-            </button>
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  tab === t.id
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-ocid="login.tab"
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {tab === "ii" ? (
+          {tab === "ii" && (
             <>
               <div
                 className="w-full rounded-lg p-4 flex items-start gap-3 text-sm"
@@ -162,8 +210,29 @@ export function LoginPage({
                     : "Sign In with Internet Identity"}
               </Button>
             </>
-          ) : (
+          )}
+
+          {tab === "local" && (
             <div className="w-full flex flex-col gap-4">
+              {/* users.json info note */}
+              <div
+                className="w-full rounded-lg p-3 flex items-start gap-2.5 text-xs"
+                style={{
+                  backgroundColor: "oklch(var(--muted))",
+                  color: "oklch(var(--muted-foreground, 0.5 0 0))",
+                  border: "1px dashed oklch(var(--border))",
+                }}
+              >
+                <FileJson className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
+                <p className="leading-relaxed">
+                  You can also sign in using credentials from the{" "}
+                  <code className="font-mono bg-black/5 px-1 py-0.5 rounded">
+                    users.json
+                  </code>{" "}
+                  file.
+                </p>
+              </div>
+
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="local-username" className="text-sm">
                   Username

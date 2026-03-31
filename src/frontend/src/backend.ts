@@ -284,6 +284,19 @@ export interface backendInterface {
     updateAsset(id: bigint, input: AssetInput): Promise<void>;
     updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
     updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
+    addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
+    updateAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: AssetInput): Promise<void>;
+    deleteAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint>;
+    updateSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: StoreSoftwareInput): Promise<void>;
+    deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
+    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
+    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
+    isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean>;
+    selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean>;
+    createFirstLocalUser(input: LocalUserInput): Promise<{ ok: bigint } | { err: string }>;
+    hasLocalUsers(): Promise<boolean>;
 }
 import type { Asset as _Asset, AssetCategory as _AssetCategory, AssetInput as _AssetInput, AssetStatus as _AssetStatus, AssignmentHistoryEntry as _AssignmentHistoryEntry, ExternalBlob as _ExternalBlob, LocalUser as _LocalUser, LocalUserInput as _LocalUserInput, Principal as _Principal, StoreSoftware as _StoreSoftware, StoreSoftwareInput as _StoreSoftwareInput, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, UserWithRole as _UserWithRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -824,6 +837,131 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+
+    async addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addAssetWithCreds(adminUsername, adminPassword, await to_candid_AssetInput_n8(this._uploadFile, this._downloadFile, input));
+                return result;
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            const result = await this.actor.addAssetWithCreds(adminUsername, adminPassword, await to_candid_AssetInput_n8(this._uploadFile, this._downloadFile, input));
+            return result;
+        }
+    }
+    async updateAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: AssetInput): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.updateAssetWithCreds(adminUsername, adminPassword, id, await to_candid_AssetInput_n8(this._uploadFile, this._downloadFile, input));
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.updateAssetWithCreds(adminUsername, adminPassword, id, await to_candid_AssetInput_n8(this._uploadFile, this._downloadFile, input));
+        }
+    }
+    async deleteAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.deleteAssetWithCreds(adminUsername, adminPassword, id);
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.deleteAssetWithCreds(adminUsername, adminPassword, id);
+        }
+    }
+    async addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addSoftwareWithCreds(adminUsername, adminPassword, to_candid_StoreSoftwareInput_n17(this._uploadFile, this._downloadFile, input));
+                return result;
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            const result = await this.actor.addSoftwareWithCreds(adminUsername, adminPassword, to_candid_StoreSoftwareInput_n17(this._uploadFile, this._downloadFile, input));
+            return result;
+        }
+    }
+    async updateSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: StoreSoftwareInput): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.updateSoftwareWithCreds(adminUsername, adminPassword, id, to_candid_StoreSoftwareInput_n17(this._uploadFile, this._downloadFile, input));
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.updateSoftwareWithCreds(adminUsername, adminPassword, id, to_candid_StoreSoftwareInput_n17(this._uploadFile, this._downloadFile, input));
+        }
+    }
+    async deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.deleteSoftwareWithCreds(adminUsername, adminPassword, id);
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.deleteSoftwareWithCreds(adminUsername, adminPassword, id);
+        }
+    }
+    async addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addLocalUserWithCreds(adminUsername, adminPassword, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, input));
+                return result;
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            const result = await this.actor.addLocalUserWithCreds(adminUsername, adminPassword, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, input));
+            return result;
+        }
+    }
+    async updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.updateLocalUserWithCreds(adminUsername, adminPassword, id, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, input));
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.updateLocalUserWithCreds(adminUsername, adminPassword, id, to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, input));
+        }
+    }
+    async deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.deleteLocalUserWithCreds(adminUsername, adminPassword, id);
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            await this.actor.deleteLocalUserWithCreds(adminUsername, adminPassword, id);
+        }
+    }
+    async isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isAdminWithCreds(adminUsername, adminPassword);
+                return result;
+            } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else {
+            const result = await this.actor.isAdminWithCreds(adminUsername, adminPassword);
+            return result;
+        }
+    }
+    async createFirstLocalUser(input: LocalUserInput): Promise<{ ok: bigint } | { err: string }> {
+        const result = await this.actor.createFirstLocalUser(to_candid_LocalUserInput_n15(this._uploadFile, this._downloadFile, input));
+        if ('ok' in result) return { ok: result.ok };
+        return { err: result.err };
+    }
+    async hasLocalUsers(): Promise<boolean> {
+        return this.actor.hasLocalUsers();
+    }
+    async selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean> {
+        try {
+            if (this.processError) {
+                try {
+                    const result = await (this.actor as any).addLocalUserWithCreds(username, password, { name, accessLevel, password } as any);
+                    return result !== undefined;
+                } catch {
+                    return false;
+                }
+            } else {
+                await (this.actor as any).addLocalUserWithCreds(username, password, { name, accessLevel, password } as any);
+                return true;
+            }
+        } catch {
+            return false;
+        }
+    }
+
 }
 function from_candid_AssetCategory_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _AssetCategory): AssetCategory {
     return from_candid_variant_n28(_uploadFile, _downloadFile, value);

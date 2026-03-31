@@ -829,6 +829,37 @@ actor {
     result;
   };
 
+
+  // Create first local user — only works when no local users exist (first-time setup)
+  public func createFirstLocalUser(input : LocalUserInput) : async { #ok : Nat; #err : Text } {
+    if (localUsers.size() > 0) {
+      return #err("Setup already complete. Please log in.");
+    };
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+    let localUser : StoreLocalUser = {
+      id;
+      name = input.name;
+      employeeCode = input.employeeCode;
+      department = input.department;
+      email = input.email;
+      notes = input.notes;
+    };
+    let creds : StoreLocalUserCredentials = {
+      username = input.username;
+      password = input.password;
+      accessLevel = "admin";
+    };
+    localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
+    #ok(id);
+  };
+
+  // Check if any local users exist (used by login page to show setup vs login)
+  public query func hasLocalUsers() : async Bool {
+    localUsers.size() > 0;
+  };
+
   public shared ({ caller }) func bootstrapAdmin() : async Bool {
     if (caller.isAnonymous()) {
       return false;
@@ -1104,4 +1135,215 @@ actor {
     };
     accessControlState.userRoles.add(user, role);
   };
-};
+
+
+// ── Credential-based write operations for local admin users ──────────────────
+
+  public shared ({ caller }) func addAssetWithCreds(adminUsername : Text, adminPassword : Text, input : AssetInput) : async Nat {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can add assets");
+    };
+    addAssetInternal(input);
+  };
+
+  public shared ({ caller }) func updateAssetWithCreds(adminUsername : Text, adminPassword : Text, id : Nat, input : AssetInput) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can update assets");
+    };
+    switch (assets.get(id)) {
+      case (null) { Runtime.trap("Asset not found") };
+      case (?existing) {
+        let updated : StoreAsset = {
+          id = existing.id;
+          name = input.name;
+          category = input.category;
+          serialNumber = input.serialNumber;
+          assignedUser = input.assignedUser;
+          location = input.location;
+          status = input.status;
+          purchaseDate = input.purchaseDate;
+          warrantyDate = input.warrantyDate;
+          notes = input.notes;
+          photoId = input.photoId;
+          createdAt = existing.createdAt;
+          processorType = input.processorType;
+          ram = input.ram;
+          storage = input.storage;
+        };
+        switch (input.employeeCode) {
+          case (null) { assetEmployeeCodes.remove(id) };
+          case (?code) { assetEmployeeCodes.add(id, code) };
+        };
+        switch (input.assetTag) {
+          case (null) { assetTags.remove(id) };
+          case (?v) { assetTags.add(id, v) };
+        };
+        switch (input.vendorName) {
+          case (null) { assetVendorNames.remove(id) };
+          case (?v) { assetVendorNames.add(id, v) };
+        };
+        switch (input.invoiceNumber) {
+          case (null) { assetInvoiceNumbers.remove(id) };
+          case (?v) { assetInvoiceNumbers.add(id, v) };
+        };
+        addToHistory(id, caller, existing.status, input);
+        assets.add(id, updated);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteAssetWithCreds(adminUsername : Text, adminPassword : Text, id : Nat) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can delete assets");
+    };
+    assets.remove(id);
+    assetEmployeeCodes.remove(id);
+    assetTags.remove(id);
+    assetVendorNames.remove(id);
+    assetInvoiceNumbers.remove(id);
+  };
+
+  public shared ({ caller }) func addSoftwareWithCreds(adminUsername : Text, adminPassword : Text, input : StoreSoftwareInput) : async Nat {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can add software");
+    };
+    addSoftwareInternal(input);
+  };
+
+  public shared ({ caller }) func updateSoftwareWithCreds(adminUsername : Text, adminPassword : Text, id : Nat, input : StoreSoftwareInput) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can update software");
+    };
+    switch (softwareInventory.get(id)) {
+      case (null) { Runtime.trap("Software not found") };
+      case (?existing) {
+        let updated = softwareInputToRecord(?id, input, existing.createdAt);
+        softwareInventory.add(id, updated);
+        switch (input.assignedTo) {
+          case (null) { softwareAssignedTo.remove(id) };
+          case (?v) { softwareAssignedTo.add(id, v) };
+        };
+        switch (input.assetTag) {
+          case (null) { softwareAssetTags.remove(id) };
+          case (?v) { softwareAssetTags.add(id, v) };
+        };
+        switch (input.invoiceNumber) {
+          case (null) { softwareInvoiceNumbers.remove(id) };
+          case (?v) { softwareInvoiceNumbers.add(id, v) };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteSoftwareWithCreds(adminUsername : Text, adminPassword : Text, id : Nat) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can delete software");
+    };
+    softwareInventory.remove(id);
+    softwareAssignedTo.remove(id);
+    softwareAssetTags.remove(id);
+    softwareInvoiceNumbers.remove(id);
+  };
+
+  public shared ({ caller }) func addLocalUserWithCreds(adminUsername : Text, adminPassword : Text, input : LocalUserInput) : async Nat {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can add local users");
+    };
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+    let localUser : StoreLocalUser = {
+      id;
+      name = input.name;
+      employeeCode = input.employeeCode;
+      department = input.department;
+      email = input.email;
+      notes = input.notes;
+    };
+    let creds : StoreLocalUserCredentials = {
+      username = input.username;
+      password = input.password;
+      accessLevel = input.accessLevel;
+    };
+    localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
+    id;
+  };
+
+  public shared ({ caller }) func updateLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat, input : LocalUserInput) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can update local users");
+    };
+    switch (localUsers.get(id)) {
+      case (null) { Runtime.trap("Local user not found") };
+      case (?existing) {
+        let updated : StoreLocalUser = {
+          id = existing.id;
+          name = input.name;
+          employeeCode = input.employeeCode;
+          department = input.department;
+          email = input.email;
+          notes = input.notes;
+        };
+        let updatedCreds : StoreLocalUserCredentials = {
+          username = input.username;
+          password = if (input.password == "") {
+            switch (localUserCredentials.get(id)) { case (?c) { c.password }; case (null) { "" } };
+          } else { input.password };
+          accessLevel = input.accessLevel;
+        };
+        localUsers.add(id, updated);
+        localUserCredentials.add(id, updatedCreds);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteLocalUserWithCreds(adminUsername : Text, adminPassword : Text, id : Nat) : async () {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can delete local users");
+    };
+    if (not localUsers.containsKey(id)) {
+      Runtime.trap("Local user not found");
+    };
+    localUsers.remove(id);
+    localUserCredentials.remove(id);
+  };
+
+  public query func isAdminWithCreds(adminUsername : Text, adminPassword : Text) : async Bool {
+    isLocalAdminCreds(adminUsername, adminPassword);
+  };
+
+  // Allows a user from users.json to self-register into the backend credential store.
+  // Safe: if username already exists with matching password, it is a no-op.
+  // If username exists with different password, it is rejected.
+  public shared func selfRegisterLocalUser(username : Text, password : Text, name : Text, accessLevel : Text) : async Bool {
+    if (username == "" or password == "") return false;
+    // Check if already registered
+    for ((id, creds) in localUserCredentials.entries()) {
+      if (creds.username == username) {
+        // Already exists — only allow if password matches (idempotent)
+        if (creds.password == password) return true;
+        return false; // username taken with different password
+      };
+    };
+    // Register new user
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+    let localUser : StoreLocalUser = {
+      id;
+      name;
+      employeeCode = "";
+      department = "";
+      email = "";
+      notes = null;
+    };
+    let creds : StoreLocalUserCredentials = {
+      username;
+      password;
+      accessLevel;
+    };
+    localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
+    true;
+  };
+
+}
