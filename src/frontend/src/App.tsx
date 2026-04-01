@@ -92,6 +92,9 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
   { id: "admin", label: "Admin", icon: <Settings className="h-4 w-4" /> },
 ];
 
+const LOGO_SRC =
+  "/assets/brand-scapes-worldwide-logo-019d47e7-0246-7340-8c61-32ae50525e90.png";
+
 function AppShell() {
   const { identity, clear, isInitializing } = useInternetIdentity();
   const { currentTheme } = useTheme();
@@ -125,10 +128,18 @@ function AppShell() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold"
-            style={{ backgroundColor: "oklch(var(--accent))" }}
+            style={{
+              background: "white",
+              borderRadius: "10px",
+              padding: "8px 16px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            }}
           >
-            A
+            <img
+              src={LOGO_SRC}
+              alt="Brandscapes Worldwide"
+              className="h-12 w-auto object-contain"
+            />
           </div>
           <p className="text-sm text-muted-foreground">Initializing...</p>
         </div>
@@ -225,16 +236,26 @@ function AppShell() {
           </button>
 
           {/* Brand */}
-          <div className="flex items-center gap-2 mr-4">
+          <div className="flex items-center mr-4">
             <div
-              className="w-7 h-7 rounded-md flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: "oklch(var(--accent))" }}
+              style={{
+                background: "white",
+                borderRadius: "6px",
+                padding: "3px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "148px",
+                overflow: "hidden",
+              }}
             >
-              A
+              <img
+                src={LOGO_SRC}
+                alt="Brandscapes Worldwide"
+                className="h-7 object-contain"
+                style={{ display: "block", width: "140px" }}
+              />
             </div>
-            <span className="text-white font-bold text-lg tracking-tight">
-              Brandscapes Assets
-            </span>
           </div>
 
           {/* Nav links (desktop) */}

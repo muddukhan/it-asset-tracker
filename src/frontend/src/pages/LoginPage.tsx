@@ -127,20 +127,26 @@ export function LoginPage({
           className="rounded-xl shadow-card p-8 flex flex-col items-center gap-6"
           style={{ backgroundColor: "oklch(var(--card))" }}
         >
-          {/* Logo */}
-          <div className="flex items-center gap-2">
+          {/* Logo — white background ensures visibility on any card color */}
+          <div className="flex items-center justify-center">
             <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-              style={{ backgroundColor: "oklch(var(--accent))" }}
+              style={{
+                background: "white",
+                borderRadius: "10px",
+                padding: "10px 20px",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.10)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              A
+              <img
+                src="/assets/brand-scapes-worldwide-logo-019d47e7-0246-7340-8c61-32ae50525e90.png"
+                alt="Brandscapes Worldwide"
+                className="h-14 w-auto object-contain"
+                style={{ display: "block" }}
+              />
             </div>
-            <span
-              className="text-2xl font-bold tracking-tight"
-              style={{ color: "oklch(var(--navbar))" }}
-            >
-              Brandscapes Assets
-            </span>
           </div>
 
           <div className="text-center space-y-1">
