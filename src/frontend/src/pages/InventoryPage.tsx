@@ -37,8 +37,8 @@ import {
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { Asset } from "../backend";
-import { AssetCategory, AssetStatus } from "../backend";
+import type { LocalAsset } from "../utils/localDB";
+
 import { AssetDetailModal } from "../components/AssetDetailModal";
 import { AssetModal } from "../components/AssetModal";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
@@ -111,12 +111,12 @@ export function InventoryPage({
   const [ageFilter, setAgeFilter] = useState<string>(initialAgeFilter ?? "all");
   const [page, setPage] = useState(1);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editAsset, setEditAsset] = useState<Asset | null>(null);
-  const [editConfirmTarget, setEditConfirmTarget] = useState<Asset | null>(
+  const [editAsset, setEditAsset] = useState<LocalAsset | null>(null);
+  const [editConfirmTarget, setEditConfirmTarget] = useState<LocalAsset | null>(
     null,
   );
-  const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [detailAsset, setDetailAsset] = useState<LocalAsset | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LocalAsset | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -224,13 +224,11 @@ export function InventoryPage({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value={AssetStatus.available}>Available</SelectItem>
-                <SelectItem value={AssetStatus.assigned}>Assigned</SelectItem>
-                <SelectItem value={AssetStatus.inStorage}>
-                  In Storage
-                </SelectItem>
-                <SelectItem value={AssetStatus.inRepair}>In Repair</SelectItem>
-                <SelectItem value={AssetStatus.retired}>Retired</SelectItem>
+                <SelectItem value={"Available"}>Available</SelectItem>
+                <SelectItem value={"Assigned"}>Assigned</SelectItem>
+                <SelectItem value={"In Storage"}>In Storage</SelectItem>
+                <SelectItem value={"In Repair"}>In Repair</SelectItem>
+                <SelectItem value={"Retired"}>Retired</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -245,9 +243,19 @@ export function InventoryPage({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {Object.values(AssetCategory).map((c) => (
+                {[
+                  "Laptop",
+                  "Desktop",
+                  "Monitor",
+                  "Phone",
+                  "Tablet",
+                  "Printer",
+                  "Server",
+                  "Network",
+                  "Other",
+                ].map((c) => (
                   <SelectItem key={c} value={c}>
-                    {c.charAt(0).toUpperCase() + c.slice(1)}
+                    {c}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -418,9 +426,9 @@ export function InventoryPage({
                           onClick={() => setDetailAsset(asset)}
                         >
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            {asset.photoId ? (
+                            {asset.photoDataUrl ? (
                               <img
-                                src={asset.photoId.getDirectURL()}
+                                src={asset.photoDataUrl}
                                 alt={asset.name}
                                 className="w-9 h-9 rounded-md object-cover border"
                               />
@@ -564,7 +572,7 @@ export function InventoryPage({
             setEditAsset(null);
           }}
           asset={editAsset}
-          isAdmin={!!isAdmin}
+          isAdmin={isAdmin !== false}
         />
         <AssetDetailModal
           asset={detailAsset}
@@ -577,7 +585,7 @@ export function InventoryPage({
             setDetailAsset(null);
             setDeleteTarget(a);
           }}
-          isAdmin={!!isAdmin}
+          isAdmin={isAdmin !== false}
         />
         <EditConfirmDialog
           open={!!editConfirmTarget}

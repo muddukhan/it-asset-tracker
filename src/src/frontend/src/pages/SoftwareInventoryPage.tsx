@@ -354,6 +354,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                         Asset Tag
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Assigned To
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Software Name
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -370,9 +373,6 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         License Key
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Assigned To
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Vendor
@@ -400,6 +400,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                           <TableCell className="text-sm text-muted-foreground">
                             {(sw as any).assetTag || "—"}
                           </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {sw.assignedTo || "—"}
+                          </TableCell>
                           <TableCell className="font-medium text-sm">
                             {sw.name}
                           </TableCell>
@@ -423,9 +426,6 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                             ) : (
                               "—"
                             )}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {sw.assignedTo || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {sw.vendor}

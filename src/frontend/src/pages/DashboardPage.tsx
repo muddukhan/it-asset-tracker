@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
-import { AssetCategory, AssetStatus } from "../backend";
+
 import { StatusBadge } from "../components/StatusBadge";
 import {
   type DashboardTheme,
@@ -43,24 +43,22 @@ import { getWarrantyStatus } from "../lib/warrantyUtils";
 
 const STAT_SKELETONS = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"] as const;
 
-const categoryIcons: Record<AssetCategory, React.ReactNode> = {
-  [AssetCategory.laptop]: <Laptop className="h-5 w-5" />,
-  [AssetCategory.desktop]: <Monitor className="h-5 w-5" />,
-  [AssetCategory.monitor]: <Monitor className="h-5 w-5" />,
-  [AssetCategory.server]: <Server className="h-5 w-5" />,
-  [AssetCategory.printer]: <Printer className="h-5 w-5" />,
-  [AssetCategory.peripheral]: <Cpu className="h-5 w-5" />,
-  [AssetCategory.other]: <HardDrive className="h-5 w-5" />,
+const categoryIcons: Record<string, React.ReactNode> = {
+  Laptop: <Laptop className="h-5 w-5" />,
+  Desktop: <Monitor className="h-5 w-5" />,
+  Monitor: <Monitor className="h-5 w-5" />,
+  Server: <Server className="h-5 w-5" />,
+  Printer: <Printer className="h-5 w-5" />,
+  Other: <HardDrive className="h-5 w-5" />,
 };
 
-const categorySmallIcons: Record<AssetCategory, React.ReactNode> = {
-  [AssetCategory.laptop]: <Laptop className="h-4 w-4" />,
-  [AssetCategory.desktop]: <Monitor className="h-4 w-4" />,
-  [AssetCategory.monitor]: <Monitor className="h-4 w-4" />,
-  [AssetCategory.server]: <Server className="h-4 w-4" />,
-  [AssetCategory.printer]: <Printer className="h-4 w-4" />,
-  [AssetCategory.peripheral]: <Cpu className="h-4 w-4" />,
-  [AssetCategory.other]: <HardDrive className="h-4 w-4" />,
+const categorySmallIcons: Record<string, React.ReactNode> = {
+  Laptop: <Laptop className="h-4 w-4" />,
+  Desktop: <Monitor className="h-4 w-4" />,
+  Monitor: <Monitor className="h-4 w-4" />,
+  Server: <Server className="h-4 w-4" />,
+  Printer: <Printer className="h-4 w-4" />,
+  Other: <HardDrive className="h-4 w-4" />,
 };
 
 type AgeBucket = {
@@ -201,7 +199,7 @@ export function DashboardPage({ onNavigate }: Props) {
 
   const retiredCount = useMemo(() => {
     if (!assets) return 0;
-    return assets.filter((a) => a.status === AssetStatus.retired).length;
+    return assets.filter((a) => a.status === "Retired").length;
   }, [assets]);
 
   const agingAssetsCount = useMemo(() => {
@@ -250,7 +248,7 @@ export function DashboardPage({ onNavigate }: Props) {
     }
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .map(([cat, count]) => ({ cat: cat as AssetCategory, count }));
+      .map(([cat, count]) => ({ cat: cat as string, count }));
   }, [assets]);
 
   const hardwareConfigAssets = useMemo(() => {
@@ -283,13 +281,12 @@ export function DashboardPage({ onNavigate }: Props) {
   }, [assets]);
 
   const availableAgeCats = useMemo(
-    () => Object.keys(categoryAgeBuckets) as AssetCategory[],
+    () => Object.keys(categoryAgeBuckets) as string[],
     [categoryAgeBuckets],
   );
 
   const defaultAgeCat = useMemo(() => {
-    if (availableAgeCats.includes(AssetCategory.laptop))
-      return AssetCategory.laptop;
+    if (availableAgeCats.includes("Laptop")) return "Laptop";
     return availableAgeCats[0] ?? null;
   }, [availableAgeCats]);
 
@@ -505,7 +502,7 @@ export function DashboardPage({ onNavigate }: Props) {
               icon={<Archive className="h-5 w-5" />}
               accentColor="oklch(var(--muted-foreground))"
               index={4}
-              onClick={() => onNavigate?.("inventory", AssetStatus.retired)}
+              onClick={() => onNavigate?.("inventory", "Retired")}
             />
             <StatCard
               label="Aging Assets"
@@ -539,11 +536,11 @@ export function DashboardPage({ onNavigate }: Props) {
           Quick filters:
         </span>
         {[
-          { label: "Available Assets", filter: AssetStatus.available },
-          { label: "In Repair", filter: AssetStatus.inRepair },
-          { label: "Assigned", filter: AssetStatus.assigned },
-          { label: "In Storage", filter: AssetStatus.inStorage },
-          { label: "Retired", filter: AssetStatus.retired },
+          { label: "Available Assets", filter: "Available" },
+          { label: "In Repair", filter: "In Repair" },
+          { label: "Assigned", filter: "Assigned" },
+          { label: "In Storage", filter: "In Storage" },
+          { label: "Retired", filter: "Retired" },
         ].map((item) => (
           <Button
             key={item.filter}
@@ -1117,7 +1114,7 @@ export function DashboardPage({ onNavigate }: Props) {
                   data-ocid="dashboard.tab"
                 >
                   <span className="opacity-80">
-                    {categorySmallIcons[cat as AssetCategory]}
+                    {categorySmallIcons[cat as string]}
                   </span>
                   {cat}
                 </button>

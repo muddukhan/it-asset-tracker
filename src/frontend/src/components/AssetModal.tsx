@@ -28,22 +28,40 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Asset, AssetInput } from "../backend";
-import { AssetCategory, AssetStatus, ExternalBlob } from "../backend";
 import { useAddAsset, useUpdateAsset } from "../hooks/useQueries";
+import type { LocalAsset } from "../utils/localDB";
+
+const CATEGORIES = [
+  "Laptop",
+  "Desktop",
+  "Monitor",
+  "Phone",
+  "Tablet",
+  "Printer",
+  "Server",
+  "Network",
+  "Other",
+];
+const STATUSES = [
+  "Available",
+  "Assigned",
+  "In Storage",
+  "In Repair",
+  "Retired",
+];
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  asset?: Asset | null;
+  asset?: LocalAsset | null;
   isAdmin?: boolean;
 };
 
 type FormState = {
   name: string;
   serialNumber: string;
-  category: AssetCategory;
-  status: AssetStatus;
+  category: string;
+  status: string;
   location: string;
   assignedUser: string;
   employeeCode: string;
@@ -61,8 +79,8 @@ type FormState = {
 const defaultForm: FormState = {
   name: "",
   serialNumber: "",
-  category: AssetCategory.laptop,
-  status: AssetStatus.available,
+  category: "Laptop",
+  status: "Available",
   location: "",
   assignedUser: "",
   employeeCode: "",
@@ -77,7 +95,7 @@ const defaultForm: FormState = {
   invoiceNumber: "",
 };
 
-export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
+export function AssetModal({ open, onClose, asset }: Props) {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -103,11 +121,11 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
         processorType: asset.processorType ?? "",
         ram: asset.ram ?? "",
         storage: asset.storage ?? "",
-        assetTag: (asset as any).assetTag ?? "",
-        vendorName: (asset as any).vendorName ?? "",
-        invoiceNumber: (asset as any).invoiceNumber ?? "",
+        assetTag: asset.assetTag ?? "",
+        vendorName: asset.vendorName ?? "",
+        invoiceNumber: asset.invoiceNumber ?? "",
       });
-      setExistingPhotoUrl(asset.photoId ? asset.photoId.getDirectURL() : null);
+      setExistingPhotoUrl(asset.photoDataUrl ?? null);
     } else {
       setForm(defaultForm);
       setExistingPhotoUrl(null);
@@ -143,20 +161,7 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) {
-      toast.error(
-        "Admin access required to add assets. Go to the Admin panel and click Make Me Admin first.",
-      );
-      return;
-    }
-    let photoId: ExternalBlob | undefined = undefined;
-    if (photoFile) {
-      const bytes = new Uint8Array(await photoFile.arrayBuffer());
-      photoId = ExternalBlob.fromBytes(bytes);
-    } else if (asset?.photoId) {
-      photoId = asset.photoId;
-    }
-    const input: AssetInput = {
+    const input = {
       name: form.name,
       serialNumber: form.serialNumber,
       category: form.category,
@@ -170,11 +175,12 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
       processorType: form.processorType || undefined,
       ram: form.ram || undefined,
       storage: form.storage || undefined,
-      photoId,
-      ...(form.assetTag ? { assetTag: form.assetTag } : {}),
-      ...(form.vendorName ? { vendorName: form.vendorName } : {}),
-      ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
-    } as AssetInput;
+      assetTag: form.assetTag || undefined,
+      vendorName: form.vendorName || undefined,
+      invoiceNumber: form.invoiceNumber || undefined,
+      photoDataUrl: existingPhotoUrl ?? undefined,
+      photoFile: photoFile ?? undefined,
+    };
     try {
       if (asset) {
         await updateAsset.mutateAsync({ id: asset.id, input });
@@ -203,16 +209,6 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
         <DialogHeader>
           <DialogTitle>{asset ? "Edit Asset" : "Add New Asset"}</DialogTitle>
         </DialogHeader>
-        {!isAdmin && (
-          <div
-            className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-700 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300"
-            data-ocid="asset.error_state"
-          >
-            <strong>Admin access required.</strong> Go to the Admin panel and
-            click <strong>Make Me Admin</strong> to enable adding or editing
-            assets.
-          </div>
-        )}
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           {/* Photo upload */}
           <div className="space-y-2">
@@ -347,9 +343,9 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(AssetCategory).map((c) => (
+                  {CATEGORIES.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {c.charAt(0).toUpperCase() + c.slice(1)}
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -362,17 +358,11 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={AssetStatus.available}>
-                    Available
-                  </SelectItem>
-                  <SelectItem value={AssetStatus.assigned}>Assigned</SelectItem>
-                  <SelectItem value={AssetStatus.inStorage}>
-                    In Storage
-                  </SelectItem>
-                  <SelectItem value={AssetStatus.inRepair}>
-                    In Repair
-                  </SelectItem>
-                  <SelectItem value={AssetStatus.retired}>Retired</SelectItem>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -407,63 +397,62 @@ export function AssetModal({ open, onClose, asset, isAdmin }: Props) {
                 data-ocid="asset.input"
               />
             </div>
-          </div>
 
-          {/* Hardware Configuration */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Separator className="flex-1" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 flex items-center gap-1.5">
-                <Cpu className="h-3.5 w-3.5" />
-                Hardware Configuration
-              </span>
-              <Separator className="flex-1" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="processorType">
-                  <span className="flex items-center gap-1.5">
-                    <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-                    Processor Type
-                  </span>
-                </Label>
-                <Input
-                  id="processorType"
-                  value={form.processorType}
-                  onChange={(e) => set("processorType")(e.target.value)}
-                  placeholder="e.g. Intel Core i7-12700"
-                  data-ocid="asset.input"
-                />
+            {/* Hardware specs */}
+            <div className="space-y-3 col-span-2">
+              <div className="flex items-center gap-2">
+                <Separator className="flex-1" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2">
+                  Hardware Specs
+                </span>
+                <Separator className="flex-1" />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ram">
-                  <span className="flex items-center gap-1.5">
-                    <MemoryStick className="h-3.5 w-3.5 text-muted-foreground" />
-                    RAM
-                  </span>
-                </Label>
-                <Input
-                  id="ram"
-                  value={form.ram}
-                  onChange={(e) => set("ram")(e.target.value)}
-                  placeholder="e.g. 16GB DDR5"
-                  data-ocid="asset.input"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="storage">
-                  <span className="flex items-center gap-1.5">
-                    <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
-                    Storage
-                  </span>
-                </Label>
-                <Input
-                  id="storage"
-                  value={form.storage}
-                  onChange={(e) => set("storage")(e.target.value)}
-                  placeholder="e.g. 512GB NVMe SSD"
-                  data-ocid="asset.input"
-                />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="processorType">
+                    <span className="flex items-center gap-1.5">
+                      <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                      Processor
+                    </span>
+                  </Label>
+                  <Input
+                    id="processorType"
+                    value={form.processorType}
+                    onChange={(e) => set("processorType")(e.target.value)}
+                    placeholder="e.g. Intel Core i7-12700"
+                    data-ocid="asset.input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ram">
+                    <span className="flex items-center gap-1.5">
+                      <MemoryStick className="h-3.5 w-3.5 text-muted-foreground" />
+                      RAM
+                    </span>
+                  </Label>
+                  <Input
+                    id="ram"
+                    value={form.ram}
+                    onChange={(e) => set("ram")(e.target.value)}
+                    placeholder="e.g. 16GB DDR5"
+                    data-ocid="asset.input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="storage">
+                    <span className="flex items-center gap-1.5">
+                      <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+                      Storage
+                    </span>
+                  </Label>
+                  <Input
+                    id="storage"
+                    value={form.storage}
+                    onChange={(e) => set("storage")(e.target.value)}
+                    placeholder="e.g. 512GB NVMe SSD"
+                    data-ocid="asset.input"
+                  />
+                </div>
               </div>
             </div>
           </div>

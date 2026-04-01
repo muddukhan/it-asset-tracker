@@ -109,12 +109,12 @@ function getWarrantyStatus(
 function exportHardwareCSV(assets: Asset[]) {
   const headers = [
     "ID",
-    "Name",
+    "Asset Tag",
+    "Emp Code",
+    "Assigned To",
+    "Asset Name",
     "Category",
     "Serial Number",
-    "Asset Tag",
-    "Assigned User",
-    "Employee Code",
     "Location",
     "Status",
     "Purchase Date",
@@ -129,12 +129,12 @@ function exportHardwareCSV(assets: Asset[]) {
   ];
   const rows = assets.map((a) => [
     String(a.id),
+    (a as any).assetTag ?? "",
+    (a.employeeCode as string | undefined) ?? "",
+    a.assignedUser ?? "",
     a.name,
     a.category,
     a.serialNumber,
-    (a as any).assetTag ?? "",
-    a.assignedUser ?? "",
-    (a.employeeCode as string | undefined) ?? "",
     a.location,
     a.status,
     a.purchaseDate ?? "",
@@ -150,6 +150,50 @@ function exportHardwareCSV(assets: Asset[]) {
   downloadCSV(
     buildCSV(headers, rows),
     `hardware-assets-${new Date().toISOString().slice(0, 10)}.csv`,
+  );
+}
+
+function exportRetiredHardwareCSV(assets: Asset[]) {
+  const retired = assets.filter((a) => a.status === "retired");
+  const headers = [
+    "ID",
+    "Asset Tag",
+    "Emp Code",
+    "Assigned To",
+    "Asset Name",
+    "Category",
+    "Serial Number",
+    "Location",
+    "Purchase Date",
+    "Warranty Date",
+    "Vendor Name",
+    "Invoice Number",
+    "Processor",
+    "RAM",
+    "Storage",
+    "Notes",
+  ];
+  const rows = retired.map((a) => [
+    String(a.id),
+    (a as any).assetTag ?? "",
+    (a.employeeCode as string | undefined) ?? "",
+    a.assignedUser ?? "",
+    a.name,
+    a.category,
+    a.serialNumber,
+    a.location,
+    a.purchaseDate ?? "",
+    (a.warrantyDate as string | undefined) ?? "",
+    (a as any).vendorName ?? "",
+    (a as any).invoiceNumber ?? "",
+    (a.processorType as string | undefined) ?? "",
+    (a.ram as string | undefined) ?? "",
+    (a.storage as string | undefined) ?? "",
+    a.notes ?? "",
+  ]);
+  downloadCSV(
+    buildCSV(headers, rows),
+    `retired-assets-${new Date().toISOString().slice(0, 10)}.csv`,
   );
 }
 
@@ -179,7 +223,7 @@ function exportSoftwareCSV(software: StoreSoftware[]) {
     "ID",
     "Asset Tag",
     "Assigned To",
-    "Name",
+    "Software Name",
     "Vendor",
     "Purchase Date",
     "License Expiry",
@@ -232,6 +276,11 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
     return Object.entries(counts)
       .map(([cat, c]) => ({ category: cat, ...c }))
       .sort((a, b) => b.total - a.total);
+  }, [assets]);
+
+  const retiredAssets = useMemo(() => {
+    if (!assets) return [];
+    return assets.filter((a) => a.status === "retired");
   }, [assets]);
 
   const softwareStats = useMemo(() => {
@@ -289,6 +338,15 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
     toast.success(`Exported ${software.length} software assets to CSV`);
   };
 
+  const handleRetiredExport = () => {
+    if (!assets || retiredAssets.length === 0) {
+      toast.error("No retired assets to export");
+      return;
+    }
+    exportRetiredHardwareCSV(assets);
+    toast.success(`Exported ${retiredAssets.length} retired assets to CSV`);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {onBack && (
@@ -337,6 +395,15 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
           >
             <Download className="h-4 w-4 mr-2" />
             Export Software CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRetiredExport}
+            disabled={assetsLoading || !assets || retiredAssets.length === 0}
+            data-ocid="reports.secondary_button"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Retired Assets
           </Button>
         </div>
       </div>
@@ -553,6 +620,137 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
                     </TableRow>
                   );
                 })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Retired Assets */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.35 }}
+        className="rounded-xl border shadow-card overflow-hidden"
+        style={{
+          backgroundColor: "oklch(var(--card))",
+          borderColor: "oklch(var(--border))",
+        }}
+      >
+        <div
+          className="px-5 py-4 border-b flex items-center justify-between"
+          style={{ borderColor: "oklch(var(--border))" }}
+        >
+          <div>
+            <h2 className="font-semibold text-base text-foreground">
+              Retired Assets
+            </h2>
+            <p
+              className="text-xs mt-0.5"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            >
+              {retiredAssets.length} retired asset
+              {retiredAssets.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        {assetsLoading ? (
+          <div className="p-5 space-y-3" data-ocid="reports.loading_state">
+            {["r1", "r2", "r3"].map((k) => (
+              <Skeleton key={k} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : retiredAssets.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-12 gap-2"
+            data-ocid="reports.empty_state"
+          >
+            <Package
+              className="h-8 w-8"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            />
+            <p
+              className="text-sm"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            >
+              No retired assets
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table data-ocid="reports.table">
+              <TableHeader>
+                <TableRow
+                  style={{ backgroundColor: "oklch(var(--muted) / 0.5)" }}
+                >
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Asset Tag
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Emp Code
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Assigned To
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Asset Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Category
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Serial #
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Purchase Date
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Warranty
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Notes
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {retiredAssets.map((asset, i) => (
+                  <TableRow
+                    key={String(asset.id)}
+                    className="hover:bg-muted/30"
+                    data-ocid={`reports.retired.${i + 1}`}
+                  >
+                    <TableCell className="text-sm text-muted-foreground font-mono">
+                      {(asset as any).assetTag || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground font-mono">
+                      {(asset.employeeCode as string | undefined) || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {asset.assignedUser || "—"}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {asset.name}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground capitalize">
+                      {asset.category}
+                    </TableCell>
+                    <TableCell className="text-sm font-mono text-muted-foreground">
+                      {asset.serialNumber}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {asset.purchaseDate || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {(asset.warrantyDate as string | undefined) || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[140px]">
+                      <span className="truncate block">
+                        {(asset as any).notes || "—"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>

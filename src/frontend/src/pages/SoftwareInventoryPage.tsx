@@ -51,9 +51,12 @@ import {
 import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { StoreSoftware, StoreSoftwareInput } from "../backend";
 import { SoftwareImportDialog } from "../components/SoftwareImportDialog";
 import { useIsCallerAdmin } from "../hooks/useQueries";
+import type {
+  LocalSoftware,
+  LocalSoftwareInput,
+} from "../hooks/useSoftwareQueries";
 import {
   useAddSoftware,
   useDeleteSoftware,
@@ -115,7 +118,7 @@ function LicenseBadge({ expiry }: { expiry?: string }) {
   );
 }
 
-type SoftwareForm = StoreSoftwareInput & {
+type SoftwareForm = LocalSoftwareInput & {
   assetTag?: string;
   invoiceNumber?: string;
   invoiceFile?: string;
@@ -147,8 +150,8 @@ export function SoftwareInventoryPage({ onBack }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<StoreSoftware | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<StoreSoftware | null>(null);
+  const [editTarget, setEditTarget] = useState<LocalSoftware | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LocalSoftware | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState<SoftwareForm>(EMPTY_FORM);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,7 +176,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
     setModalOpen(true);
   };
 
-  const openEdit = (s: StoreSoftware) => {
+  const openEdit = (s: LocalSoftware) => {
     setEditTarget(s);
     setForm({
       name: s.name,
@@ -216,7 +219,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       toast.error("Software name and vendor are required");
       return;
     }
-    const input: StoreSoftwareInput = {
+    const input: LocalSoftwareInput = {
       name: form.name.trim(),
       vendor: form.vendor.trim(),
       purchaseDate: form.purchaseDate || undefined,
@@ -233,7 +236,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
             invoiceFileName: form.invoiceFileName,
           }
         : {}),
-    } as StoreSoftwareInput;
+    } as LocalSoftwareInput;
     try {
       if (editTarget) {
         await updateSoftware.mutateAsync({ id: editTarget.id, input });

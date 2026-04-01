@@ -1,34 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { StoreSoftware, StoreSoftwareInput } from "../backend";
-import { useLocalAdminCreds } from "../context/LocalSessionContext";
-import { useActor } from "./useActor";
+import {
+  type LocalSoftware,
+  type LocalSoftwareInput,
+  localDB,
+} from "../utils/localDB";
+
+export type { LocalSoftware, LocalSoftwareInput };
 
 export function useGetAllSoftware() {
-  const { actor, isFetching } = useActor();
-  return useQuery<StoreSoftware[]>({
+  return useQuery<LocalSoftware[]>({
     queryKey: ["software"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllSoftware();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localDB.getAllSoftware(),
+    staleTime: 0,
   });
 }
 
 export function useAddSoftware() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (input: StoreSoftwareInput) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.addSoftwareWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          input,
-        );
-      return actor.addSoftware(input);
+    mutationFn: async (input: LocalSoftwareInput) => {
+      return localDB.addSoftware(input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });
@@ -37,23 +28,15 @@ export function useAddSoftware() {
 }
 
 export function useUpdateSoftware() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async ({
       id,
       input,
-    }: { id: bigint; input: StoreSoftwareInput }) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.updateSoftwareWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-          input,
-        );
-      return actor.updateSoftware(id, input);
+    }: { id: number; input: LocalSoftwareInput }) => {
+      const result = localDB.updateSoftware(id, input);
+      if (!result) throw new Error("Software not found");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });
@@ -62,19 +45,10 @@ export function useUpdateSoftware() {
 }
 
 export function useDeleteSoftware() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.deleteSoftwareWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-        );
-      return actor.deleteSoftware(id);
+    mutationFn: async (id: number) => {
+      return localDB.deleteSoftware(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });

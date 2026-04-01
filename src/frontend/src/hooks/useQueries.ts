@@ -1,10 +1,6 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  Asset,
-  AssetCategory,
-  AssetInput,
-  AssetStatus,
   LocalUser,
   LocalUserInput,
   UserRole,
@@ -14,52 +10,50 @@ import {
   useLocalAdminCreds,
   useLocalSession,
 } from "../context/LocalSessionContext";
+import {
+  type LocalAsset,
+  type LocalAssetInput,
+  fileToBase64,
+  localDB,
+} from "../utils/localDB";
 import { useActor } from "./useActor";
 
+export type { LocalAsset, LocalAssetInput };
+
 export function useGetAllAssets() {
-  const { actor, isFetching } = useActor();
-  return useQuery<Asset[]>({
+  return useQuery<LocalAsset[]>({
     queryKey: ["assets"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllAssets();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localDB.getAllAssets(),
+    staleTime: 0,
   });
 }
 
 export function useFilterAssets(
-  status: AssetStatus | null,
-  category: AssetCategory | null,
-  location: string | null,
-  searchTerm: string | null,
+  _status: string | null,
+  _category: string | null,
+  _location: string | null,
+  _searchTerm: string | null,
 ) {
-  const { actor, isFetching } = useActor();
-  return useQuery<Asset[]>({
-    queryKey: ["assets", "filter", status, category, location, searchTerm],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllAssets();
-    },
-    enabled: !!actor && !isFetching,
+  return useQuery<LocalAsset[]>({
+    queryKey: ["assets"],
+    queryFn: () => localDB.getAllAssets(),
+    staleTime: 0,
   });
 }
 
 export function useGetStats() {
-  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["stats"],
-    queryFn: async () => {
-      if (!actor)
-        return {
-          total: BigInt(0),
-          available: BigInt(0),
-          assigned: BigInt(0),
-          inRepair: BigInt(0),
-        };
-      return actor.getStats();
+    queryFn: () => {
+      const s = localDB.getStats();
+      return {
+        total: BigInt(s.total),
+        available: BigInt(s.available),
+        assigned: BigInt(s.assigned),
+        inRepair: BigInt(s.inRepair),
+      };
     },
-    enabled: !!actor && !isFetching,
+    staleTime: 0,
   });
 }
 
@@ -108,7 +102,8 @@ export function useIsCallerAdmin() {
         return false;
       }
     },
-    enabled: (!!actor && !isFetching) || localSession?.accessLevel === "admin",
+    initialData: localSession?.accessLevel === "admin" ? true : undefined,
+    enabled: localSession?.accessLevel !== "admin" && !!actor && !isFetching,
   });
 }
 
@@ -168,19 +163,15 @@ export function useGetAllUsersWithRoles(isAdmin: boolean) {
 }
 
 export function useAddAsset() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (input: AssetInput) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.addAssetWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          input,
-        );
-      return actor.addAsset(input);
+    mutationFn: async (input: LocalAssetInput & { photoFile?: File }) => {
+      let photoDataUrl: string | undefined = input.photoDataUrl;
+      if (input.photoFile) {
+        photoDataUrl = await fileToBase64(input.photoFile);
+      }
+      const { photoFile: _photoFile, ...rest } = input;
+      return localDB.addAsset({ ...rest, photoDataUrl });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -190,20 +181,18 @@ export function useAddAsset() {
 }
 
 export function useUpdateAsset() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async ({ id, input }: { id: bigint; input: AssetInput }) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.updateAssetWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-          input,
-        );
-      return actor.updateAsset(id, input);
+    mutationFn: async ({
+      id,
+      input,
+    }: { id: number; input: LocalAssetInput & { photoFile?: File } }) => {
+      let photoDataUrl: string | undefined = input.photoDataUrl;
+      if (input.photoFile) {
+        photoDataUrl = await fileToBase64(input.photoFile);
+      }
+      const { photoFile: _photoFile, ...rest } = input;
+      return localDB.updateAsset(id, { ...rest, photoDataUrl });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -213,19 +202,10 @@ export function useUpdateAsset() {
 }
 
 export function useDeleteAsset() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.deleteAssetWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-        );
-      return actor.deleteAsset(id);
+    mutationFn: async (id: number) => {
+      return localDB.deleteAsset(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });

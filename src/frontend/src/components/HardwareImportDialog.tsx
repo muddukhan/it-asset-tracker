@@ -17,7 +17,7 @@ import {
 import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AssetCategory, AssetStatus } from "../backend";
+
 import { useAddAsset } from "../hooks/useQueries";
 import { parseCsv } from "../lib/csvImport";
 
@@ -36,23 +36,23 @@ const PREVIEW_COLUMNS = [
   "employeeName",
 ];
 
-const CATEGORY_MAP: Record<string, AssetCategory> = {
-  laptop: AssetCategory.laptop,
-  desktop: AssetCategory.desktop,
-  monitor: AssetCategory.monitor,
-  printer: AssetCategory.printer,
-  server: AssetCategory.server,
-  other: AssetCategory.other,
+const CATEGORY_MAP: Record<string, string> = {
+  laptop: "Laptop",
+  desktop: "Desktop",
+  monitor: "Monitor",
+  printer: "Printer",
+  server: "Server",
+  other: "Other",
 };
 
-const STATUS_MAP: Record<string, AssetStatus> = {
-  available: AssetStatus.available,
-  assigned: AssetStatus.assigned,
-  "in repair": AssetStatus.inRepair,
-  inrepair: AssetStatus.inRepair,
-  "in storage": AssetStatus.inStorage,
-  instorage: AssetStatus.inStorage,
-  retired: AssetStatus.retired,
+const STATUS_MAP: Record<string, string> = {
+  available: "Available",
+  assigned: "Assigned",
+  "in repair": "In Repair",
+  inrepair: "In Repair",
+  "in storage": "In Storage",
+  instorage: "In Storage",
+  retired: "Retired",
 };
 
 function downloadTemplate() {
@@ -99,12 +99,8 @@ export function HardwareImportDialog({ open, onOpenChange }: Props) {
           name: row.assetName || "Unnamed Asset",
           serialNumber: row.serialNumber || "",
           location: row.location || "",
-          category:
-            CATEGORY_MAP[row.category?.toLowerCase().trim()] ??
-            AssetCategory.other,
-          status:
-            STATUS_MAP[row.status?.toLowerCase().trim()] ??
-            AssetStatus.available,
+          category: CATEGORY_MAP[row.category?.toLowerCase().trim()] ?? "Other",
+          status: STATUS_MAP[row.status?.toLowerCase().trim()] ?? "Available",
           processorType: row.processorType || undefined,
           ram: row.ram || undefined,
           storage: row.storage || undefined,

@@ -21,9 +21,10 @@ import {
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
-import type { Asset, StoreSoftware } from "../backend";
 import { useGetAllAssets, useGetStats } from "../hooks/useQueries";
+import type { LocalSoftware as StoreSoftware } from "../hooks/useSoftwareQueries";
 import { useGetAllSoftware } from "../hooks/useSoftwareQueries";
+import type { LocalAsset as Asset } from "../utils/localDB";
 
 const STAT_SKELETONS = ["r1", "r2", "r3", "r4"] as const;
 

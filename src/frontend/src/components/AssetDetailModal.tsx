@@ -25,16 +25,16 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import type { Asset } from "../backend";
 import { useGetHistoryForAsset } from "../hooks/useQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
+import type { LocalAsset } from "../utils/localDB";
 import { StatusBadge } from "./StatusBadge";
 
 type Props = {
-  asset: Asset | null;
+  asset: LocalAsset | null;
   onClose: () => void;
-  onEdit: (asset: Asset) => void;
-  onDelete: (asset: Asset) => void;
+  onEdit: (asset: LocalAsset) => void;
+  onDelete: (asset: LocalAsset) => void;
   isAdmin: boolean;
 };
 
@@ -110,8 +110,10 @@ function formatTimestamp(ts: bigint): string {
   });
 }
 
-function HistoryTab({ assetId }: { assetId: bigint }) {
-  const { data: history, isLoading } = useGetHistoryForAsset(assetId);
+function HistoryTab({ assetId }: { assetId: number | bigint }) {
+  const { data: history, isLoading } = useGetHistoryForAsset(
+    typeof assetId === "number" ? BigInt(assetId) : assetId,
+  );
 
   if (isLoading) {
     return (
@@ -257,9 +259,9 @@ export function AssetDetailModal({
 
           <TabsContent value="details" className="mt-4 space-y-4">
             {/* Photo */}
-            {asset.photoId ? (
+            {asset.photoDataUrl ? (
               <img
-                src={asset.photoId.getDirectURL()}
+                src={asset.photoDataUrl}
                 alt={asset.name}
                 className="w-full h-48 object-cover rounded-xl border"
               />

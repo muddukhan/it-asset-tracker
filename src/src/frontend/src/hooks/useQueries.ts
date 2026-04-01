@@ -10,7 +10,10 @@ import type {
   UserRole,
   UserWithRole,
 } from "../backend";
-import { useLocalAdminCreds } from "../context/LocalSessionContext";
+import {
+  useLocalAdminCreds,
+  useLocalSession,
+} from "../context/LocalSessionContext";
 import { addToLocalUserRegistry } from "../utils/localUserRegistry";
 import { useActor } from "./useActor";
 
@@ -88,9 +91,18 @@ export function useGetHistoryForAsset(assetId: bigint | null) {
 export function useIsCallerAdmin() {
   const { actor, isFetching } = useActor();
   const localAdminCreds = useLocalAdminCreds();
+  const localSession = useLocalSession();
+
+  // If local session already says admin, return true immediately without a backend round-trip.
+  // This covers users from users.json and localStorage registry who may not be synced
+  // to the backend yet.
+  const isLocalAdmin = localSession?.accessLevel === "admin";
+
   return useQuery<boolean>({
-    queryKey: ["isAdmin", localAdminCreds?.username],
+    queryKey: ["isAdmin", localAdminCreds?.username, isLocalAdmin],
     queryFn: async () => {
+      // Trust the local session first
+      if (isLocalAdmin) return true;
       if (!actor) return false;
       try {
         if (localAdminCreds) {
@@ -104,7 +116,10 @@ export function useIsCallerAdmin() {
         return false;
       }
     },
-    enabled: !!actor && !isFetching,
+    // If we already know from local session, we don't need to wait for actor
+    enabled: isLocalAdmin || (!!actor && !isFetching),
+    // Immediately return true if local session says admin
+    initialData: isLocalAdmin ? true : undefined,
   });
 }
 
