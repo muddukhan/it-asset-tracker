@@ -39,14 +39,16 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Monitor,
+  Paperclip,
   Pencil,
   Plus,
   Search,
   Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { StoreSoftware, StoreSoftwareInput } from "../backend";
 import { useIsCallerAdmin } from "../hooks/useQueries";
@@ -59,6 +61,7 @@ import {
 
 const PAGE_SIZE = 15;
 const SKELETON_ROWS = ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6"] as const;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 type Props = { onBack?: () => void };
 
@@ -113,6 +116,8 @@ function LicenseBadge({ expiry }: { expiry?: string }) {
 type SoftwareForm = StoreSoftwareInput & {
   assetTag?: string;
   invoiceNumber?: string;
+  invoiceFile?: string;
+  invoiceFileName?: string;
 };
 
 const EMPTY_FORM: SoftwareForm = {
@@ -126,6 +131,8 @@ const EMPTY_FORM: SoftwareForm = {
   assignedTo: "",
   assetTag: "",
   invoiceNumber: "",
+  invoiceFile: "",
+  invoiceFileName: "",
 };
 
 export function SoftwareInventoryPage({ onBack }: Props) {
@@ -141,6 +148,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
   const [editTarget, setEditTarget] = useState<StoreSoftware | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreSoftware | null>(null);
   const [form, setForm] = useState<SoftwareForm>(EMPTY_FORM);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     if (!software) return [];
@@ -175,8 +183,29 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       assignedTo: s.assignedTo ?? "",
       assetTag: (s as any).assetTag ?? "",
       invoiceNumber: (s as any).invoiceNumber ?? "",
+      invoiceFile: (s as any).invoiceFile ?? "",
+      invoiceFileName: (s as any).invoiceFileName ?? "",
     });
     setModalOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size exceeds 5 MB. Please choose a smaller file.");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setForm((f) => ({
+        ...f,
+        invoiceFile: ev.target?.result as string,
+        invoiceFileName: file.name,
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async () => {
@@ -195,6 +224,12 @@ export function SoftwareInventoryPage({ onBack }: Props) {
       assignedTo: form.assignedTo || undefined,
       ...(form.assetTag ? { assetTag: form.assetTag } : {}),
       ...(form.invoiceNumber ? { invoiceNumber: form.invoiceNumber } : {}),
+      ...(form.invoiceFile
+        ? {
+            invoiceFile: form.invoiceFile,
+            invoiceFileName: form.invoiceFileName,
+          }
+        : {}),
     } as StoreSoftwareInput;
     try {
       if (editTarget) {
@@ -381,6 +416,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                         Invoice No.
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Invoice
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Notes
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
@@ -432,6 +470,23 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {(sw as any).invoiceNumber || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {(sw as any).invoiceFile ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
+                                onClick={() =>
+                                  window.open((sw as any).invoiceFile, "_blank")
+                                }
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                View
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[140px]">
                             <span className="truncate block">
@@ -663,6 +718,70 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                     setForm((f) => ({ ...f, invoiceNumber: e.target.value }))
                   }
                   placeholder="e.g. INV-2024-0001"
+                  data-ocid="software.input"
+                />
+              </div>
+            </div>
+            {/* Attach Invoice — after Invoice Number, before Notes */}
+            <div className="grid gap-1.5">
+              <Label>Attach Invoice</Label>
+              <div className="flex flex-col gap-2">
+                {/* Show existing attachment when editing */}
+                {form.invoiceFile && form.invoiceFileName && (
+                  <div className="flex items-center gap-2 text-sm rounded-lg border border-dashed px-3 py-2 bg-muted/30">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate text-muted-foreground flex-1">
+                      {form.invoiceFileName}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1 text-primary hover:text-primary shrink-0"
+                      onClick={() => window.open(form.invoiceFile, "_blank")}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          invoiceFile: "",
+                          invoiceFileName: "",
+                        }))
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-ocid="software.upload_button"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    {form.invoiceFile ? "Replace File" : "Choose File"}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    PDF, PNG, JPG, DOC up to 5 MB
+                  </span>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  className="hidden"
+                  onChange={handleFileChange}
                   data-ocid="software.input"
                 />
               </div>
