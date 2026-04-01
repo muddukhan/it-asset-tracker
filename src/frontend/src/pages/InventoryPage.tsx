@@ -32,6 +32,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
@@ -42,6 +43,7 @@ import { AssetDetailModal } from "../components/AssetDetailModal";
 import { AssetModal } from "../components/AssetModal";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 import { EditConfirmDialog } from "../components/EditConfirmDialog";
+import { HardwareImportDialog } from "../components/HardwareImportDialog";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   useDeleteAsset,
@@ -115,6 +117,7 @@ export function InventoryPage({
   );
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (!assets) return [];
@@ -301,16 +304,38 @@ export function InventoryPage({
                 {filtered.length} asset{filtered.length !== 1 ? "s" : ""} found
               </p>
             </div>
-            <Button
-              onClick={() => {
-                setEditAsset(null);
-                setAddModalOpen(true);
-              }}
-              data-ocid="inventory.open_modal_button"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Add Asset
-            </Button>
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        onClick={() => setImportOpen(true)}
+                        disabled={!isAdmin}
+                        data-ocid="inventory.import_button"
+                      >
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        Import Data
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!isAdmin && (
+                    <TooltipContent>Admin access required</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              <Button
+                onClick={() => {
+                  setEditAsset(null);
+                  setAddModalOpen(true);
+                }}
+                data-ocid="inventory.open_modal_button"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Asset
+              </Button>
+            </div>
           </div>
 
           {assetsLoading ? (
@@ -567,6 +592,7 @@ export function InventoryPage({
           assetName={deleteTarget?.name}
           isPending={deleteAsset.isPending}
         />
+        <HardwareImportDialog open={importOpen} onOpenChange={setImportOpen} />
       </div>
     </TooltipProvider>
   );

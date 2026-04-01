@@ -46,11 +46,13 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { StoreSoftware, StoreSoftwareInput } from "../backend";
+import { SoftwareImportDialog } from "../components/SoftwareImportDialog";
 import { useIsCallerAdmin } from "../hooks/useQueries";
 import {
   useAddSoftware,
@@ -147,6 +149,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StoreSoftware | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreSoftware | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState<SoftwareForm>(EMPTY_FORM);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -337,23 +340,43 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                 {filtered.length !== 1 ? "s" : ""} found
               </p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    onClick={openAdd}
-                    disabled={isAdmin === false}
-                    data-ocid="software.open_modal_button"
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Add Software
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {isAdmin === false && (
-                <TooltipContent>Admin access required</TooltipContent>
-              )}
-            </Tooltip>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setImportOpen(true)}
+                      disabled={isAdmin === false}
+                      data-ocid="software.import_button"
+                    >
+                      <Upload className="h-4 w-4 mr-1.5" />
+                      Import Data
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isAdmin === false && (
+                  <TooltipContent>Admin access required</TooltipContent>
+                )}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      onClick={openAdd}
+                      disabled={isAdmin === false}
+                      data-ocid="software.open_modal_button"
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Add Software
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isAdmin === false && (
+                  <TooltipContent>Admin access required</TooltipContent>
+                )}
+              </Tooltip>
+            </div>
           </div>
 
           {isLoading ? (
@@ -854,6 +877,7 @@ export function SoftwareInventoryPage({ onBack }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <SoftwareImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </TooltipProvider>
   );
 }

@@ -1,25 +1,31 @@
-# Brandscapes Assets
+# Brandscapes Assets - Import Data Feature
 
 ## Current State
-Full IT asset tracker with hardware/software inventory, admin role management, local user authentication, dashboard analytics, and CSV export. The backend had no stable variables — all state (admin assignments, local users, assets) was wiped on every deployment.
+- Hardware Inventory (InventoryPage.tsx) has an "Add Asset" button to add single assets
+- Software Inventory (SoftwareInventoryPage.tsx) has an "Add Software" button to add single software entries
+- No bulk import capability exists in either inventory
 
 ## Requested Changes (Diff)
 
 ### Add
-- Stable variables for all persistent data: admin role assignment, local users, assets, software, history, counters
-- Proper `preupgrade()` hook to serialize all state before upgrade
-- Proper `postupgrade()` hook to restore state after upgrade (with sample data seeding only on first-ever run)
+- "Import Data" button next to the existing Add Asset/Add Software button in both inventory pages
+- CSV template download option so users know the expected format
+- File upload dialog (accepts .csv and .xlsx/.xls files) that parses the file and bulk-inserts records
+- Import preview/summary showing how many rows were found and any errors before confirming
+- Hardware CSV columns: assetTag, employeeCode, employeeName (mapped to assignedUser), assetName (name), category, status, location, serialNumber, processorType, ram, storage, warrantyDate, purchaseDate, vendorName, invoiceNumber, notes
+- Software CSV columns: assetTag, assignedTo, softwareName (name), vendor, purchaseDate, licenseExpiry, licenseType, licenseKey, employeeCode, employeeName, invoiceNumber, notes
+- Calls addAssetWithCreds / addSoftwareWithCreds for local admin users, or addAsset / addSoftware for II users
 
 ### Modify
-- `getUserRole` in access-control.mo: return `#guest` for unregistered principals instead of trapping with `Runtime.trap`. This prevents crashes when checking admin status for new users.
-- `bootstrapAdmin` now works reliably since `isCallerAdmin` no longer traps for unregistered users.
+- InventoryPage.tsx: add Import Data button in the header toolbar (next to Add Asset)
+- SoftwareInventoryPage.tsx: add Import Data button in the header toolbar (next to Add Software)
 
 ### Remove
-- Empty `preupgrade()` stub
-- Simple `postupgrade()` that only checked if initialized
+- Nothing removed
 
 ## Implementation Plan
-1. Update `access-control.mo`: change `getUserRole` null case to return `#guest` instead of `Runtime.trap`
-2. Add 20 stable variables in `main.mo` covering all persistent data
-3. Implement full `preupgrade()` that saves all map entries to stable arrays
-4. Implement full `postupgrade()` that restores all data and only seeds samples on first run
+1. Create a reusable CSV parser utility in src/frontend/src/lib/csvImport.ts that parses CSV text into row objects
+2. Create HardwareImportDialog.tsx component with: file input, CSV download template, parse preview, bulk submit using addAssetWithCreds/addAsset
+3. Create SoftwareImportDialog.tsx component with: file input, CSV download template, parse preview, bulk submit using addSoftwareWithCreds/addSoftware
+4. Wire Import Data button in InventoryPage.tsx header
+5. Wire Import Data button in SoftwareInventoryPage.tsx header
