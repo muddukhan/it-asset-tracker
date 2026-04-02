@@ -83,6 +83,17 @@ function buildCSV(headers: string[], rows: string[][]): string {
     .join("\n");
 }
 
+/** Formats a stored date string (e.g. "2024-01-15", "2024-01-15T00:00:00") to "DD/MM/YYYY" for Excel */
+function formatDateForExport(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -138,8 +149,8 @@ function exportHardwareCSV(assets: Asset[]) {
     (a.employeeCode as string | undefined) ?? "",
     a.location,
     a.status,
-    a.purchaseDate ?? "",
-    (a.warrantyDate as string | undefined) ?? "",
+    formatDateForExport(a.purchaseDate),
+    formatDateForExport(a.warrantyDate as string | undefined),
     getWarrantyStatus(a.warrantyDate as string | null | undefined),
     (a as any).vendorName ?? "",
     (a as any).invoiceNumber ?? "",
@@ -196,8 +207,8 @@ function exportSoftwareCSV(software: StoreSoftware[]) {
     s.assignedTo ?? "",
     s.name,
     s.vendor,
-    s.purchaseDate ?? "",
-    s.licenseExpiry ?? "",
+    formatDateForExport(s.purchaseDate),
+    formatDateForExport(s.licenseExpiry),
     LICENSE_STATUS_LABEL[
       getSoftwareLicenseStatus(s.licenseExpiry as string | null | undefined)
     ],

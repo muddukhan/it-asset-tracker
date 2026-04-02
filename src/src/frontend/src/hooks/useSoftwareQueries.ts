@@ -57,6 +57,7 @@ export function useUpdateSoftware() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });
+      queryClient.invalidateQueries({ queryKey: ["history"] });
     },
   });
 }

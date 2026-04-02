@@ -986,7 +986,7 @@ actor {
           case (?v) { assetInvoiceNumbers.add(id, v) };
         };
 
-        addToHistory(id, caller, existing.status, input);
+        addToHistory(id, caller, existing.status, existing.assignedUser, input);
         assets.add(id, updated);
       };
     };
@@ -1057,16 +1057,33 @@ actor {
     ).map(toAsset).sort();
   };
 
-  func addToHistory(assetId : Nat, changedBy : Principal.Principal, fromStatus : AssetStatus, input : AssetInput) {
+  func addToHistory(assetId : Nat, changedBy : Principal.Principal, fromStatus : AssetStatus, fromAssignee : ?Text, input : AssetInput) {
     let entry : StoreAssignmentHistoryEntry = {
       id = nextHistoryId;
       assetId;
       assetName = input.name;
       changedBy;
-      fromAssignee = null;
+      fromAssignee;
       toAssignee = input.assignedUser;
       fromStatus;
       toStatus = input.status;
+      timestamp = Time.now();
+    };
+    nextHistoryId += 1;
+    history.add(entry.id, entry);
+  };
+
+
+  func addSoftwareToHistory(softwareId : Nat, changedBy : Principal.Principal, fromAssignee : ?Text, input : StoreSoftwareInput) {
+    let entry : StoreAssignmentHistoryEntry = {
+      id = nextHistoryId;
+      assetId = softwareId;
+      assetName = input.name;
+      changedBy;
+      fromAssignee;
+      toAssignee = input.assignedTo;
+      fromStatus = #assigned;
+      toStatus = #assigned;
       timestamp = Time.now();
     };
     nextHistoryId += 1;
@@ -1123,6 +1140,7 @@ actor {
     switch (softwareInventory.get(id)) {
       case (null) { Runtime.trap("Software not found") };
       case (?existing) {
+        let prevAssignee = softwareAssignedTo.get(id);
         let updated = softwareInputToRecord(?id, input, existing.createdAt);
         softwareInventory.add(id, updated);
         switch (input.assignedTo) {
@@ -1137,6 +1155,7 @@ actor {
           case (null) { softwareInvoiceNumbers.remove(id) };
           case (?v) { softwareInvoiceNumbers.add(id, v) };
         };
+        addSoftwareToHistory(id, caller, prevAssignee, input);
       };
     };
   };
@@ -1215,7 +1234,7 @@ actor {
           case (null) { assetInvoiceNumbers.remove(id) };
           case (?v) { assetInvoiceNumbers.add(id, v) };
         };
-        addToHistory(id, caller, existing.status, input);
+        addToHistory(id, caller, existing.status, existing.assignedUser, input);
         assets.add(id, updated);
       };
     };
@@ -1246,6 +1265,7 @@ actor {
     switch (softwareInventory.get(id)) {
       case (null) { Runtime.trap("Software not found") };
       case (?existing) {
+        let prevAssignee = softwareAssignedTo.get(id);
         let updated = softwareInputToRecord(?id, input, existing.createdAt);
         softwareInventory.add(id, updated);
         switch (input.assignedTo) {
@@ -1260,6 +1280,7 @@ actor {
           case (null) { softwareInvoiceNumbers.remove(id) };
           case (?v) { softwareInvoiceNumbers.add(id, v) };
         };
+        addSoftwareToHistory(id, caller, prevAssignee, input);
       };
     };
   };

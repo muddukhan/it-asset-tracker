@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Download,
   History,
   Search,
 } from "lucide-react";
@@ -34,6 +35,17 @@ function formatTimestamp(ts: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Formats a timestamp (ms) to "DD/MM/YYYY HH:MM" for Excel export */
+function formatTimestampForExport(ts: number): string {
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }
 
 function StatusPill({ label }: { label: string }) {
@@ -56,6 +68,66 @@ function StatusPill({ label }: { label: string }) {
 }
 
 const SKELETONS = ["h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8"] as const;
+
+// ─── CSV export helper ───────────────────────────────────────────────────────
+function exportTransfersToCSV(
+  rows: LocalHistoryEntry[],
+  allByAsset: Map<string, LocalHistoryEntry[]>,
+) {
+  const csvEscape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const headers = [
+    "Asset Name",
+    "Asset ID",
+    "Transfer #",
+    "From Employee",
+    "To Employee",
+    "Transfer Date",
+    "Changed By",
+    "Total Transfers",
+  ];
+
+  const csvRows: string[] = [headers.map(csvEscape).join(",")];
+
+  for (const entry of rows) {
+    const assetKey = String(entry.assetId);
+    const trail = (allByAsset.get(assetKey) ?? []).filter(
+      (e) =>
+        e.fromAssignee &&
+        e.toAssignee &&
+        e.fromAssignee !== e.toAssignee &&
+        e.fromAssignee.trim() !== "" &&
+        e.toAssignee.trim() !== "",
+    );
+    const sorted = [...trail].sort((a, b) => a.timestamp - b.timestamp);
+    const totalTransfers = sorted.length;
+
+    sorted.forEach((t, idx) => {
+      csvRows.push(
+        [
+          csvEscape(entry.assetName),
+          csvEscape(assetKey),
+          csvEscape(String(idx + 1)),
+          csvEscape(t.fromAssignee ?? ""),
+          csvEscape(t.toAssignee ?? ""),
+          csvEscape(formatTimestampForExport(t.timestamp)),
+          csvEscape(t.changedBy),
+          csvEscape(String(totalTransfers)),
+        ].join(","),
+      );
+    });
+  }
+
+  const blob = new Blob([csvRows.join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `transfer-asset-list-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ─── Transfer track (timeline) for a single asset ───────────────────────────
 function TransferTrack({ entries }: { entries: LocalHistoryEntry[] }) {
@@ -198,13 +270,26 @@ function TransferAssetList({
             data-ocid="transfer.search_input"
           />
         </div>
-        <Badge
-          variant="outline"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm"
-        >
-          <ArrowLeftRight className="h-3.5 w-3.5" />
-          {isLoading ? "…" : `${uniqueAssetIds.size} assets transferred`}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm"
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            {isLoading ? "…" : `${uniqueAssetIds.size} assets transferred`}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportTransfersToCSV(rows, allByAsset)}
+            disabled={isLoading || rows.length === 0}
+            className="flex items-center gap-1.5"
+            data-ocid="transfer.export_button"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <motion.div
