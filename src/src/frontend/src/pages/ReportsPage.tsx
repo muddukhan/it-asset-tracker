@@ -125,6 +125,7 @@ function exportHardwareCSV(assets: Asset[]) {
     "Processor",
     "RAM",
     "Storage",
+    "Windows Version",
     "Notes",
   ];
   const rows = assets.map((a) => [
@@ -145,6 +146,7 @@ function exportHardwareCSV(assets: Asset[]) {
     (a.processorType as string | undefined) ?? "",
     (a.ram as string | undefined) ?? "",
     (a.storage as string | undefined) ?? "",
+    (a as any).windowsVersion ?? "",
     a.notes ?? "",
   ]);
   downloadCSV(
@@ -171,6 +173,7 @@ function exportRetiredHardwareCSV(assets: Asset[]) {
     "Processor",
     "RAM",
     "Storage",
+    "Windows Version",
     "Notes",
   ];
   const rows = retired.map((a) => [
@@ -189,6 +192,7 @@ function exportRetiredHardwareCSV(assets: Asset[]) {
     (a.processorType as string | undefined) ?? "",
     (a.ram as string | undefined) ?? "",
     (a.storage as string | undefined) ?? "",
+    (a as any).windowsVersion ?? "",
     a.notes ?? "",
   ]);
   downloadCSV(

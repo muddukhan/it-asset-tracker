@@ -22,11 +22,12 @@ import { useAddAsset } from "../hooks/useQueries";
 import { parseCsv } from "../lib/csvImport";
 
 const TEMPLATE_HEADERS =
-  "assetTag,employeeCode,employeeName,assetName,category,status,location,serialNumber,processorType,ram,storage,warrantyDate,purchaseDate,vendorName,invoiceNumber,notes";
+  "assetTag,employeeCode,employeeName,assetName,category,status,location,serialNumber,processorType,ram,storage,windowsVersion,warrantyDate,purchaseDate,vendorName,invoiceNumber,notes";
 
 const TEMPLATE_HINT =
   "# Valid category values: Laptop, Desktop, Monitor, Printer, Server, Network, Phone, Tablet, Other\n" +
-  "# Valid status values: Available, Assigned, In Repair, In Storage, Retired\n";
+  "# Valid status values: Available, Assigned, In Repair, In Storage, Retired\n" +
+  "# windowsVersion example: Windows 11 Pro, Windows 10 Home\n";
 
 const PREVIEW_COLUMNS = [
   "assetTag",
@@ -34,6 +35,7 @@ const PREVIEW_COLUMNS = [
   "category",
   "status",
   "employeeName",
+  "windowsVersion",
 ];
 
 const CATEGORY_MAP: Record<string, string> = {
@@ -66,6 +68,16 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
+/** Save windowsVersion into the separate localStorage map used by InventoryPage */
+function saveWindowsVersion(serialNumber: string, version: string) {
+  if (!serialNumber || !version) return;
+  const map: Record<string, string> = JSON.parse(
+    localStorage.getItem("asset_windows_versions") || "{}",
+  );
+  map[serialNumber] = version;
+  localStorage.setItem("asset_windows_versions", JSON.stringify(map));
+}
+
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
 export function HardwareImportDialog({ open, onOpenChange }: Props) {
@@ -92,12 +104,13 @@ export function HardwareImportDialog({ open, onOpenChange }: Props) {
     let failed = 0;
     for (const row of rows) {
       try {
-        await addAsset.mutateAsync({
+        const serialNumber = row.serialNumber || "";
+        const asset = await addAsset.mutateAsync({
           assetTag: row.assetTag || undefined,
           employeeCode: row.employeeCode || undefined,
           assignedUser: row.employeeName || undefined,
           name: row.assetName || "Unnamed Asset",
-          serialNumber: row.serialNumber || "",
+          serialNumber,
           location: row.location || "",
           category: CATEGORY_MAP[row.category?.toLowerCase().trim()] ?? "Other",
           status: STATUS_MAP[row.status?.toLowerCase().trim()] ?? "Available",
@@ -110,6 +123,12 @@ export function HardwareImportDialog({ open, onOpenChange }: Props) {
           invoiceNumber: row.invoiceNumber || undefined,
           notes: row.notes || undefined,
         });
+        // Store Windows Version in the separate map keyed by serialNumber
+        if (row.windowsVersion && serialNumber) {
+          saveWindowsVersion(serialNumber, row.windowsVersion);
+        } else if (row.windowsVersion && asset?.serialNumber) {
+          saveWindowsVersion(asset.serialNumber, row.windowsVersion);
+        }
         success++;
       } catch {
         failed++;
