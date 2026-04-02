@@ -476,6 +476,9 @@ export function InventoryPage({
                         Photo
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Asset Tag
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Asset Name
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -535,6 +538,9 @@ export function InventoryPage({
                                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
                               </div>
                             )}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono text-muted-foreground">
+                            {asset.assetTag || "—"}
                           </TableCell>
                           <TableCell className="font-medium text-sm">
                             {asset.name}
