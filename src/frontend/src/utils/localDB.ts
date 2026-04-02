@@ -2,6 +2,8 @@ const ASSETS_KEY = "brandscapes_assets";
 const SOFTWARE_KEY = "brandscapes_software";
 const ASSET_ID_KEY = "brandscapes_next_asset_id";
 const SOFTWARE_ID_KEY = "brandscapes_next_software_id";
+const HISTORY_KEY = "brandscapes_history";
+const HISTORY_ID_KEY = "brandscapes_next_history_id";
 const SEEDED_KEY = "brandscapes_seeded";
 
 export type LocalAsset = {
@@ -48,6 +50,18 @@ export type LocalSoftware = {
 
 export type LocalSoftwareInput = Omit<LocalSoftware, "id" | "createdAt">;
 
+export type LocalHistoryEntry = {
+  id: number;
+  assetId: number;
+  assetName: string;
+  changedBy: string;
+  fromAssignee?: string;
+  toAssignee?: string;
+  fromStatus: string;
+  toStatus: string;
+  timestamp: number; // ms epoch
+};
+
 function readAssets(): LocalAsset[] {
   try {
     return JSON.parse(localStorage.getItem(ASSETS_KEY) ?? "[]");
@@ -72,6 +86,18 @@ function writeSoftware(sw: LocalSoftware[]): void {
   localStorage.setItem(SOFTWARE_KEY, JSON.stringify(sw));
 }
 
+function readHistory(): LocalHistoryEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeHistory(entries: LocalHistoryEntry[]): void {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+}
+
 function nextAssetId(): number {
   const n = Number(localStorage.getItem(ASSET_ID_KEY) ?? "1");
   localStorage.setItem(ASSET_ID_KEY, String(n + 1));
@@ -82,6 +108,36 @@ function nextSoftwareId(): number {
   const n = Number(localStorage.getItem(SOFTWARE_ID_KEY) ?? "1");
   localStorage.setItem(SOFTWARE_ID_KEY, String(n + 1));
   return n;
+}
+
+function nextHistoryId(): number {
+  const n = Number(localStorage.getItem(HISTORY_ID_KEY) ?? "1");
+  localStorage.setItem(HISTORY_ID_KEY, String(n + 1));
+  return n;
+}
+
+function recordHistory(
+  assetId: number,
+  assetName: string,
+  fromStatus: string,
+  toStatus: string,
+  fromAssignee: string | undefined,
+  toAssignee: string | undefined,
+  changedBy: string,
+): void {
+  const entries = readHistory();
+  entries.push({
+    id: nextHistoryId(),
+    assetId,
+    assetName,
+    changedBy,
+    fromAssignee: fromAssignee || undefined,
+    toAssignee: toAssignee || undefined,
+    fromStatus,
+    toStatus,
+    timestamp: Date.now(),
+  });
+  writeHistory(entries);
 }
 
 function seed(): void {
@@ -197,6 +253,16 @@ export const localDB = {
     };
     assets.push(asset);
     writeAssets(assets);
+    // Record history for new asset
+    recordHistory(
+      asset.id,
+      asset.name,
+      "",
+      asset.status,
+      undefined,
+      asset.assignedUser,
+      "local-admin",
+    );
     return asset;
   },
 
@@ -204,14 +270,25 @@ export const localDB = {
     const assets = readAssets();
     const idx = assets.findIndex((a) => a.id === id);
     if (idx === -1) return null;
+    const prev = assets[idx];
     const updated: LocalAsset = {
-      ...assets[idx],
+      ...prev,
       ...input,
       id,
-      createdAt: assets[idx].createdAt,
+      createdAt: prev.createdAt,
     };
     assets[idx] = updated;
     writeAssets(assets);
+    // Record history — capture previous assignee so transfers are tracked
+    recordHistory(
+      id,
+      updated.name,
+      prev.status,
+      updated.status,
+      prev.assignedUser,
+      updated.assignedUser,
+      "local-admin",
+    );
     return updated;
   },
 
@@ -260,6 +337,10 @@ export const localDB = {
     if (filtered.length === all.length) return false;
     writeSoftware(filtered);
     return true;
+  },
+
+  getHistory(): LocalHistoryEntry[] {
+    return readHistory().sort((a, b) => b.timestamp - a.timestamp);
   },
 
   getStats(): {

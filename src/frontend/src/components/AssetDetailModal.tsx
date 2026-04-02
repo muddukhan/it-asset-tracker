@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -99,9 +98,8 @@ function WarrantyStatusIndicator({ warrantyDate }: { warrantyDate?: string }) {
   );
 }
 
-function formatTimestamp(ts: bigint): string {
-  const ms = Number(ts / 1_000_000n);
-  return new Date(ms).toLocaleString("en-US", {
+function formatTimestamp(ts: number): string {
+  return new Date(ts).toLocaleString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -110,10 +108,8 @@ function formatTimestamp(ts: bigint): string {
   });
 }
 
-function HistoryTab({ assetId }: { assetId: number | bigint }) {
-  const { data: history, isLoading } = useGetHistoryForAsset(
-    typeof assetId === "number" ? BigInt(assetId) : assetId,
-  );
+function HistoryTab({ assetId }: { assetId: number }) {
+  const { data: history, isLoading } = useGetHistoryForAsset(assetId);
 
   if (isLoading) {
     return (
@@ -132,18 +128,20 @@ function HistoryTab({ assetId }: { assetId: number | bigint }) {
         data-ocid="asset.empty_state"
       >
         <Clock className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">No history recorded yet</p>
+        <p className="text-sm text-muted-foreground">
+          No history recorded yet — edit this asset to start tracking
+        </p>
       </div>
     );
   }
 
-  const sorted = [...history].sort((a, b) => Number(b.timestamp - a.timestamp));
+  const sorted = [...history].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <ul className="divide-y">
       {sorted.map((entry, i) => (
         <li
-          key={String(entry.id)}
+          key={entry.id}
           className="py-3 flex items-start gap-3"
           data-ocid={`asset.item.${i + 1}`}
         >
@@ -151,23 +149,28 @@ function HistoryTab({ assetId }: { assetId: number | bigint }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono text-muted-foreground">
-                {entry.changedBy.toString().slice(0, 8)}…
+                {entry.changedBy}
               </span>
-              <span className="text-xs text-muted-foreground">changed</span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {String(entry.fromStatus)}
-              </span>
-              <span className="text-xs text-muted-foreground">→</span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-foreground font-medium">
-                {String(entry.toStatus)}
-              </span>
+              {entry.fromStatus && (
+                <>
+                  <span className="text-xs text-muted-foreground">changed</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {entry.fromStatus}
+                  </span>
+                  <span className="text-xs text-muted-foreground">→</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-foreground font-medium">
+                    {entry.toStatus}
+                  </span>
+                </>
+              )}
             </div>
-            {(entry.fromAssignee || entry.toAssignee) && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Assignee: {entry.fromAssignee || "(none)"} →{" "}
-                {entry.toAssignee || "(none)"}
-              </p>
-            )}
+            {(entry.fromAssignee || entry.toAssignee) &&
+              entry.fromAssignee !== entry.toAssignee && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assignee: {entry.fromAssignee || "(none)"} →{" "}
+                  {entry.toAssignee || "(none)"}
+                </p>
+              )}
             <p className="text-xs text-muted-foreground mt-0.5">
               {formatTimestamp(entry.timestamp)}
             </p>
@@ -209,7 +212,7 @@ export function AssetDetailModal({
                   {asset.category}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono">
-                  #{String(asset.id)}
+                  #{asset.id}
                 </span>
               </div>
             </div>

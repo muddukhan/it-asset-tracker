@@ -13,12 +13,13 @@ import {
 import {
   type LocalAsset,
   type LocalAssetInput,
+  type LocalHistoryEntry,
   fileToBase64,
   localDB,
 } from "../utils/localDB";
 import { useActor } from "./useActor";
 
-export type { LocalAsset, LocalAssetInput };
+export type { LocalAsset, LocalAssetInput, LocalHistoryEntry };
 
 export function useGetAllAssets() {
   return useQuery<LocalAsset[]>({
@@ -58,26 +59,22 @@ export function useGetStats() {
 }
 
 export function useGetHistory() {
-  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["history"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getHistory();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localDB.getHistory(),
+    staleTime: 0,
   });
 }
 
-export function useGetHistoryForAsset(assetId: bigint | null) {
-  const { actor, isFetching } = useActor();
+export function useGetHistoryForAsset(assetId: number | null) {
   return useQuery({
     queryKey: ["history", "asset", assetId?.toString()],
-    queryFn: async () => {
-      if (!actor || assetId === null) return [];
-      return actor.getHistoryForAsset(assetId);
+    queryFn: () => {
+      if (assetId === null) return [];
+      return localDB.getHistory().filter((e) => e.assetId === assetId);
     },
-    enabled: !!actor && !isFetching && assetId !== null,
+    enabled: assetId !== null,
+    staleTime: 0,
   });
 }
 
@@ -176,6 +173,7 @@ export function useAddAsset() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: ["history"] });
     },
   });
 }
@@ -197,6 +195,7 @@ export function useUpdateAsset() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: ["history"] });
     },
   });
 }
