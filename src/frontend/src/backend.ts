@@ -945,20 +945,31 @@ export class Backend implements backendInterface {
         return this.actor.hasLocalUsers();
     }
     async selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean> {
+        if (!username || !password) return false;
         try {
-            if (this.processError) {
-                try {
-                    const result = await (this.actor as any).addLocalUserWithCreds(username, password, { name, accessLevel, password } as any);
-                    return result !== undefined;
-                } catch {
-                    return false;
-                }
-            } else {
-                await (this.actor as any).addLocalUserWithCreds(username, password, { name, accessLevel, password } as any);
-                return true;
-            }
+            // First try the dedicated selfRegisterLocalUser backend function
+            const result = await (this.actor as any).selfRegisterLocalUser(username, password, name, accessLevel);
+            // Handle both Bool and variant return types
+            if (typeof result === 'boolean') return result;
+            if (result && ('ok' in result || 'alreadyExists' in result)) return true;
+            return !!result;
         } catch {
-            return false;
+            // Fallback: use addLocalUserWithCreds with complete input
+            try {
+                await (this.actor as any).addLocalUserWithCreds(username, password, {
+                    name,
+                    username,
+                    password,
+                    accessLevel,
+                    employeeCode: '',
+                    department: '',
+                    email: '',
+                    notes: [],
+                } as any);
+                return true;
+            } catch {
+                return false;
+            }
         }
     }
 

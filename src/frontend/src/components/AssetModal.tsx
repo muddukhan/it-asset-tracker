@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Loader2,
   MemoryStick,
+  Monitor,
   Upload,
   X,
 } from "lucide-react";
@@ -71,6 +72,7 @@ type FormState = {
   processorType: string;
   ram: string;
   storage: string;
+  windowsVersion: string;
   assetTag: string;
   vendorName: string;
   invoiceNumber: string;
@@ -90,10 +92,19 @@ const defaultForm: FormState = {
   processorType: "",
   ram: "",
   storage: "",
+  windowsVersion: "",
   assetTag: "",
   vendorName: "",
   invoiceNumber: "",
 };
+
+function getWindowsVersions(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem("asset_windows_versions") || "{}");
+  } catch {
+    return {};
+  }
+}
 
 export function AssetModal({ open, onClose, asset }: Props) {
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -107,6 +118,7 @@ export function AssetModal({ open, onClose, asset }: Props) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentional trigger
   useEffect(() => {
     if (asset) {
+      const winVersions = getWindowsVersions();
       setForm({
         name: asset.name,
         serialNumber: asset.serialNumber,
@@ -121,6 +133,7 @@ export function AssetModal({ open, onClose, asset }: Props) {
         processorType: asset.processorType ?? "",
         ram: asset.ram ?? "",
         storage: asset.storage ?? "",
+        windowsVersion: winVersions[asset.serialNumber] ?? "",
         assetTag: asset.assetTag ?? "",
         vendorName: asset.vendorName ?? "",
         invoiceNumber: asset.invoiceNumber ?? "",
@@ -188,6 +201,20 @@ export function AssetModal({ open, onClose, asset }: Props) {
       } else {
         await addAsset.mutateAsync(input);
         toast.success("Asset added successfully");
+      }
+      // Save windows version to localStorage
+      const key = form.serialNumber;
+      if (key) {
+        const versions = getWindowsVersions();
+        if (form.windowsVersion) {
+          versions[key] = form.windowsVersion;
+        } else {
+          delete versions[key];
+        }
+        localStorage.setItem(
+          "asset_windows_versions",
+          JSON.stringify(versions),
+        );
       }
       onClose();
     } catch {
@@ -407,7 +434,7 @@ export function AssetModal({ open, onClose, asset }: Props) {
                 </span>
                 <Separator className="flex-1" />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="processorType">
                     <span className="flex items-center gap-1.5">
@@ -450,6 +477,21 @@ export function AssetModal({ open, onClose, asset }: Props) {
                     value={form.storage}
                     onChange={(e) => set("storage")(e.target.value)}
                     placeholder="e.g. 512GB NVMe SSD"
+                    data-ocid="asset.input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="windowsVersion">
+                    <span className="flex items-center gap-1.5">
+                      <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                      Windows Version
+                    </span>
+                  </Label>
+                  <Input
+                    id="windowsVersion"
+                    value={form.windowsVersion}
+                    onChange={(e) => set("windowsVersion")(e.target.value)}
+                    placeholder="e.g. Windows 11 Pro"
                     data-ocid="asset.input"
                   />
                 </div>

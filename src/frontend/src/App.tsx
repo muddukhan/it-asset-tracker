@@ -22,7 +22,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { LocalSessionContext } from "./context/LocalSessionContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import {
@@ -54,34 +54,7 @@ type PageState = {
 };
 
 import type { LocalSession } from "./context/LocalSessionContext";
-import { useLocalAdminCreds } from "./context/LocalSessionContext";
-import { useActor } from "./hooks/useActor";
 export type { LocalSession } from "./context/LocalSessionContext";
-
-function CredentialSyncEffect() {
-  const { actor } = useActor();
-  const localAdminCreds = useLocalAdminCreds();
-  const syncedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!actor || !localAdminCreds) return;
-    const key = localAdminCreds.username;
-    if (syncedRef.current === key) return;
-    syncedRef.current = key;
-    const session = loadLocalSession();
-    if (!session) return;
-    (actor as any)
-      .selfRegisterLocalUser(
-        localAdminCreds.username,
-        localAdminCreds.password,
-        session.name,
-        session.accessLevel,
-      )
-      .catch(() => {
-        // ignore
-      });
-  }, [actor, localAdminCreds]);
-  return null;
-}
 
 function loadLocalSession(): LocalSession | null {
   try {
@@ -238,7 +211,6 @@ function AppShell() {
 
   return (
     <LocalSessionContext.Provider value={{ localSession }}>
-      <CredentialSyncEffect />
       <div
         id="app-root"
         className="min-h-screen flex flex-col bg-background"

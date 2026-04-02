@@ -5,6 +5,8 @@ const SOFTWARE_ID_KEY = "brandscapes_next_software_id";
 const HISTORY_KEY = "brandscapes_history";
 const HISTORY_ID_KEY = "brandscapes_next_history_id";
 const SEEDED_KEY = "brandscapes_seeded";
+const USERS_KEY = "brandscapes_local_users";
+const USERS_ID_KEY = "brandscapes_next_user_id";
 
 export type LocalAsset = {
   id: number;
@@ -62,6 +64,21 @@ export type LocalHistoryEntry = {
   timestamp: number; // ms epoch
 };
 
+export type LocalDBUser = {
+  id: number;
+  name: string;
+  username: string;
+  password: string;
+  accessLevel: string; // "admin" | "readwrite" | "readonly"
+  employeeCode: string;
+  department: string;
+  email: string;
+  notes?: string;
+  createdAt: number;
+};
+
+export type LocalDBUserInput = Omit<LocalDBUser, "id" | "createdAt">;
+
 function readAssets(): LocalAsset[] {
   try {
     return JSON.parse(localStorage.getItem(ASSETS_KEY) ?? "[]");
@@ -98,6 +115,18 @@ function writeHistory(entries: LocalHistoryEntry[]): void {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
 }
 
+function readUsers(): LocalDBUser[] {
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeUsers(users: LocalDBUser[]): void {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
 function nextAssetId(): number {
   const n = Number(localStorage.getItem(ASSET_ID_KEY) ?? "1");
   localStorage.setItem(ASSET_ID_KEY, String(n + 1));
@@ -113,6 +142,12 @@ function nextSoftwareId(): number {
 function nextHistoryId(): number {
   const n = Number(localStorage.getItem(HISTORY_ID_KEY) ?? "1");
   localStorage.setItem(HISTORY_ID_KEY, String(n + 1));
+  return n;
+}
+
+function nextUserId(): number {
+  const n = Number(localStorage.getItem(USERS_ID_KEY) ?? "1");
+  localStorage.setItem(USERS_ID_KEY, String(n + 1));
   return n;
 }
 
@@ -358,6 +393,99 @@ export const localDB = {
         (a) => a.status === "InRepair" || a.status === "In Repair",
       ).length,
     };
+  },
+
+  // ── Local User Management (localStorage-based, no backend dependency) ──
+
+  getAllUsers(): LocalDBUser[] {
+    return readUsers();
+  },
+
+  findByUsername(username: string): LocalDBUser | null {
+    return readUsers().find((u) => u.username === username) ?? null;
+  },
+
+  findByCredentials(username: string, password: string): LocalDBUser | null {
+    return (
+      readUsers().find(
+        (u) => u.username === username && u.password === password,
+      ) ?? null
+    );
+  },
+
+  addUser(input: LocalDBUserInput): LocalDBUser {
+    const users = readUsers();
+    // Prevent duplicate usernames
+    if (users.some((u) => u.username === input.username)) {
+      throw new Error(`Username "${input.username}" already exists`);
+    }
+    const user: LocalDBUser = {
+      ...input,
+      id: nextUserId(),
+      createdAt: Date.now(),
+    };
+    users.push(user);
+    writeUsers(users);
+    return user;
+  },
+
+  // Add or update a user by username (upsert — used when syncing from users.json)
+  upsertUserByUsername(input: LocalDBUserInput): LocalDBUser {
+    const users = readUsers();
+    const idx = users.findIndex((u) => u.username === input.username);
+    if (idx !== -1) {
+      // Update existing (keep id and createdAt)
+      const updated: LocalDBUser = {
+        ...users[idx],
+        ...input,
+        id: users[idx].id,
+        createdAt: users[idx].createdAt,
+      };
+      users[idx] = updated;
+      writeUsers(users);
+      return updated;
+    }
+    // New user
+    const user: LocalDBUser = {
+      ...input,
+      id: nextUserId(),
+      createdAt: Date.now(),
+    };
+    users.push(user);
+    writeUsers(users);
+    return user;
+  },
+
+  updateUser(id: number, input: LocalDBUserInput): LocalDBUser | null {
+    const users = readUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx === -1) return null;
+    // Check username uniqueness (allow keeping same username)
+    const duplicate = users.find(
+      (u) => u.username === input.username && u.id !== id,
+    );
+    if (duplicate) {
+      throw new Error(`Username "${input.username}" already exists`);
+    }
+    const updated: LocalDBUser = {
+      ...users[idx],
+      ...input,
+      // Keep password if empty string passed (means "don't change")
+      password: input.password || users[idx].password,
+      id,
+      createdAt: users[idx].createdAt,
+    };
+    users[idx] = updated;
+    writeUsers(users);
+    return updated;
+  },
+
+  deleteUser(id: number): boolean {
+    const users = readUsers();
+    const filtered = users.filter((u) => u.id !== id);
+    if (filtered.length === users.length) return false;
+    writeUsers(filtered);
+    return true;
   },
 };
 

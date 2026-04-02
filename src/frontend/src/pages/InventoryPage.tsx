@@ -91,6 +91,14 @@ function WarrantyBadge({ warrantyDate }: { warrantyDate?: string }) {
   );
 }
 
+function getWindowsVersions(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem("asset_windows_versions") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export function InventoryPage({
   initialStatusFilter,
   initialCategoryFilter,
@@ -118,6 +126,9 @@ export function InventoryPage({
   const [detailAsset, setDetailAsset] = useState<LocalAsset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LocalAsset | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: addModalOpen triggers refresh after modal close
+  const windowsVersions = useMemo(() => getWindowsVersions(), [addModalOpen]);
 
   const filtered = useMemo(() => {
     if (!assets) return [];
@@ -408,6 +419,9 @@ export function InventoryPage({
                         Warranty
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Windows Version
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Notes
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
@@ -461,6 +475,9 @@ export function InventoryPage({
                           </TableCell>
                           <TableCell>
                             <WarrantyBadge warrantyDate={asset.warrantyDate} />
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {windowsVersions[asset.serialNumber] || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[140px]">
                             <span className="truncate block">

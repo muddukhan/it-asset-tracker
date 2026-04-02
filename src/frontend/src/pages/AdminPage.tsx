@@ -37,28 +37,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend";
 import type { UserWithRole } from "../backend";
-
-interface LocalUser {
-  id: bigint;
-  name: string;
-  username: string;
-  accessLevel: string;
-  employeeCode: string;
-  email: string;
-  notes?: string;
-  department: string;
-}
-
-interface LocalUserInput {
-  name: string;
-  username: string;
-  password: string;
-  accessLevel: string;
-  employeeCode: string;
-  email: string;
-  notes?: string;
-  department: string;
-}
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddLocalUser,
@@ -71,6 +49,18 @@ import {
   useIsCallerAdmin,
   useUpdateLocalUser,
 } from "../hooks/useQueries";
+import type { LocalDBUser } from "../utils/localDB";
+
+interface LocalUserFormInput {
+  name: string;
+  username: string;
+  password: string;
+  accessLevel: string;
+  employeeCode: string;
+  email: string;
+  notes?: string;
+  department: string;
+}
 
 function roleBadge(role: UserRole) {
   if (role === UserRole.admin) {
@@ -217,7 +207,7 @@ function UserRoleRow({
   );
 }
 
-const emptyLocalUserForm = (): LocalUserInput => ({
+const emptyForm = (): LocalUserFormInput => ({
   name: "",
   username: "",
   password: "",
@@ -232,14 +222,14 @@ function LocalUserRow({
   user,
   index,
 }: {
-  user: LocalUser;
+  user: LocalDBUser;
   index: number;
 }) {
   const updateMutation = useUpdateLocalUser();
   const deleteMutation = useDeleteLocalUser();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [form, setForm] = useState<LocalUserInput>({
+  const [form, setForm] = useState<LocalUserFormInput>({
     name: user.name,
     username: user.username,
     password: "",
@@ -260,11 +250,23 @@ function LocalUserRow({
       return;
     }
     try {
-      await (updateMutation as any).mutateAsync({ id: user.id, input: form });
+      await updateMutation.mutateAsync({
+        id: user.id,
+        input: {
+          name: form.name,
+          username: form.username,
+          password: form.password, // empty = keep existing
+          accessLevel: form.accessLevel,
+          employeeCode: form.employeeCode,
+          department: form.department,
+          email: form.email,
+          notes: form.notes,
+        },
+      });
       toast.success("User updated");
       setEditing(false);
-    } catch {
-      toast.error("Failed to update user");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update user");
     }
   };
 
@@ -491,7 +493,7 @@ function LocalUserRow({
 
 function AddLocalUserForm({ onClose }: { onClose: () => void }) {
   const addMutation = useAddLocalUser();
-  const [form, setForm] = useState<LocalUserInput>(emptyLocalUserForm());
+  const [form, setForm] = useState<LocalUserFormInput>(emptyForm());
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -507,11 +509,20 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
       return;
     }
     try {
-      await (addMutation as any).mutateAsync(form);
+      await addMutation.mutateAsync({
+        name: form.name,
+        username: form.username,
+        password: form.password,
+        accessLevel: form.accessLevel,
+        employeeCode: form.employeeCode,
+        department: form.department,
+        email: form.email,
+        notes: form.notes,
+      });
       toast.success("User added successfully");
       onClose();
-    } catch {
-      toast.error("Failed to add user");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to add user");
     }
   };
 
@@ -747,7 +758,7 @@ export function AdminPage({
     setSelectedRole(UserRole.admin);
   };
 
-  if (adminLoading) {
+  if (adminLoading && !isLocalAdmin) {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-10 w-48" />
@@ -1068,80 +1079,64 @@ export function AdminPage({
         </motion.div>
       </div>
 
-      {/* Users & Roles section */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35 }}
-        className="rounded-xl border shadow-card overflow-hidden"
-        style={{
-          backgroundColor: "oklch(var(--card))",
-          borderColor: "oklch(var(--border))",
-        }}
-      >
-        <div
-          className="px-5 py-4 border-b flex items-center gap-2"
-          style={{ borderColor: "oklch(var(--border))" }}
+      {/* Users & Roles section (Internet Identity users) */}
+      {usersWithRoles && usersWithRoles.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          className="rounded-xl border shadow-card overflow-hidden"
+          style={{
+            backgroundColor: "oklch(var(--card))",
+            borderColor: "oklch(var(--border))",
+          }}
         >
-          <UserCog
-            className="h-4 w-4"
-            style={{ color: "oklch(var(--muted-foreground))" }}
-          />
-          <h2 className="font-semibold text-base text-foreground">
-            Registered Users &amp; Roles
-          </h2>
-          {usersWithRoles && (
+          <div
+            className="px-5 py-4 border-b flex items-center gap-2"
+            style={{ borderColor: "oklch(var(--border))" }}
+          >
+            <UserCog
+              className="h-4 w-4"
+              style={{ color: "oklch(var(--muted-foreground))" }}
+            />
+            <h2 className="font-semibold text-base text-foreground">
+              Internet Identity Users &amp; Roles
+            </h2>
             <Badge variant="secondary" className="ml-auto">
               {usersWithRoles.length} user
               {usersWithRoles.length !== 1 ? "s" : ""}
             </Badge>
-          )}
-        </div>
+          </div>
 
-        {usersLoading ? (
-          <div className="p-5 space-y-3" data-ocid="admin.loading_state">
-            {["r1", "r2", "r3"].map((k) => (
-              <Skeleton key={k} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : !usersWithRoles || usersWithRoles.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 gap-2"
-            data-ocid="admin.empty_state"
-          >
-            <Users
-              className="h-8 w-8"
-              style={{ color: "oklch(var(--muted-foreground))" }}
-            />
-            <p
-              className="text-sm"
-              style={{ color: "oklch(var(--muted-foreground))" }}
-            >
-              No users registered yet
-            </p>
-          </div>
-        ) : (
-          <Table data-ocid="admin.table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Principal ID</TableHead>
-                <TableHead>Access Level</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usersWithRoles.map((entry, i) => (
-                <UserRoleRow
-                  key={entry.principal.toString()}
-                  entry={entry}
-                  index={i + 1}
-                  myPrincipal={myPrincipal}
-                />
+          {usersLoading ? (
+            <div className="p-5 space-y-3" data-ocid="admin.loading_state">
+              {["r1", "r2", "r3"].map((k) => (
+                <Skeleton key={k} className="h-12 w-full" />
               ))}
-            </TableBody>
-          </Table>
-        )}
-      </motion.div>
+            </div>
+          ) : (
+            <Table data-ocid="admin.table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Principal ID</TableHead>
+                  <TableHead>Access Level</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {usersWithRoles.map((entry, i) => (
+                  <UserRoleRow
+                    key={entry.principal.toString()}
+                    entry={entry}
+                    index={i + 1}
+                    myPrincipal={myPrincipal}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </motion.div>
+      )}
 
       {/* Local Users */}
       <motion.div
@@ -1213,10 +1208,12 @@ export function AdminPage({
               className="text-sm"
               style={{ color: "oklch(var(--muted-foreground))" }}
             >
-              No users added yet
+              No local users yet
             </p>
             <p className="text-xs text-muted-foreground">
-              Click &quot;Add User&quot; above to add your first user
+              Click &quot;Add User&quot; above or users from{" "}
+              <code className="font-mono text-xs">users.json</code> appear here
+              after first login
             </p>
           </div>
         ) : (
@@ -1235,11 +1232,7 @@ export function AdminPage({
               </TableHeader>
               <TableBody>
                 {localUsers.map((u, i) => (
-                  <LocalUserRow
-                    key={u.id.toString()}
-                    user={u as unknown as LocalUser}
-                    index={i + 1}
-                  />
+                  <LocalUserRow key={u.id} user={u} index={i + 1} />
                 ))}
               </TableBody>
             </Table>

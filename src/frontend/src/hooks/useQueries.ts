@@ -1,25 +1,25 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  LocalUser,
-  LocalUserInput,
-  UserRole,
-  UserWithRole,
-} from "../backend";
-import {
-  useLocalAdminCreds,
-  useLocalSession,
-} from "../context/LocalSessionContext";
+import type { UserRole, UserWithRole } from "../backend";
+import { useLocalSession } from "../context/LocalSessionContext";
 import {
   type LocalAsset,
   type LocalAssetInput,
+  type LocalDBUser,
+  type LocalDBUserInput,
   type LocalHistoryEntry,
   fileToBase64,
   localDB,
 } from "../utils/localDB";
 import { useActor } from "./useActor";
 
-export type { LocalAsset, LocalAssetInput, LocalHistoryEntry };
+export type {
+  LocalAsset,
+  LocalAssetInput,
+  LocalHistoryEntry,
+  LocalDBUser,
+  LocalDBUserInput,
+};
 
 export function useGetAllAssets() {
   return useQuery<LocalAsset[]>({
@@ -79,21 +79,14 @@ export function useGetHistoryForAsset(assetId: number | null) {
 }
 
 export function useIsCallerAdmin() {
-  const { actor, isFetching } = useActor();
-  const localAdminCreds = useLocalAdminCreds();
   const localSession = useLocalSession();
+  const { actor, isFetching } = useActor();
   return useQuery<boolean>({
-    queryKey: ["isAdmin", localAdminCreds?.username],
+    queryKey: ["isAdmin", localSession?.username],
     queryFn: async () => {
       if (localSession?.accessLevel === "admin") return true;
       if (!actor) return false;
       try {
-        if (localAdminCreds) {
-          return await actor.isAdminWithCreds(
-            localAdminCreds.username,
-            localAdminCreds.password,
-          );
-        }
         return await actor.isCallerAdmin();
       } catch {
         return false;
@@ -213,32 +206,24 @@ export function useDeleteAsset() {
   });
 }
 
+// ── Local User Management ──
+// All local user operations use localDB (localStorage) directly.
+// This is intentional: the backend canister loses state on every deployment,
+// making credential-based auth unreliable. localStorage is permanent.
+
 export function useGetAllLocalUsers() {
-  const { actor, isFetching } = useActor();
-  return useQuery<LocalUser[]>({
+  return useQuery<LocalDBUser[]>({
     queryKey: ["localUsers"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllLocalUsers();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localDB.getAllUsers(),
+    staleTime: 0,
   });
 }
 
 export function useAddLocalUser() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (input: LocalUserInput) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.addLocalUserWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          input,
-        );
-      return actor.addLocalUser(input);
+    mutationFn: async (input: LocalDBUserInput) => {
+      return localDB.addUser(input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -247,23 +232,15 @@ export function useAddLocalUser() {
 }
 
 export function useUpdateLocalUser() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
     mutationFn: async ({
       id,
       input,
-    }: { id: bigint; input: LocalUserInput }) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.updateLocalUserWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-          input,
-        );
-      return actor.updateLocalUser(id, input);
+    }: { id: number; input: LocalDBUserInput }) => {
+      const result = localDB.updateUser(id, input);
+      if (!result) throw new Error("User not found");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -272,19 +249,11 @@ export function useUpdateLocalUser() {
 }
 
 export function useDeleteLocalUser() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
-  const localAdminCreds = useLocalAdminCreds();
   return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      if (localAdminCreds)
-        return actor.deleteLocalUserWithCreds(
-          localAdminCreds.username,
-          localAdminCreds.password,
-          id,
-        );
-      return actor.deleteLocalUser(id);
+    mutationFn: async (id: number) => {
+      const ok = localDB.deleteUser(id);
+      if (!ok) throw new Error("User not found");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
