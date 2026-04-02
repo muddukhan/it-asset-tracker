@@ -117,6 +117,8 @@ export function InventoryPage({
     initialCategoryFilter ?? "all",
   );
   const [ageFilter, setAgeFilter] = useState<string>(initialAgeFilter ?? "all");
+  const [processorFilter, setProcessorFilter] = useState<string>("all");
+  const [ramFilter, setRamFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editAsset, setEditAsset] = useState<LocalAsset | null>(null);
@@ -130,6 +132,25 @@ export function InventoryPage({
   // biome-ignore lint/correctness/useExhaustiveDependencies: addModalOpen triggers refresh after modal close
   const windowsVersions = useMemo(() => getWindowsVersions(), [addModalOpen]);
 
+  // Derive unique processor and RAM values from assets for filter dropdowns
+  const processorOptions = useMemo(() => {
+    if (!assets) return [];
+    const set = new Set<string>();
+    for (const a of assets) {
+      if (a.processorType) set.add(a.processorType);
+    }
+    return Array.from(set).sort();
+  }, [assets]);
+
+  const ramOptions = useMemo(() => {
+    if (!assets) return [];
+    const set = new Set<string>();
+    for (const a of assets) {
+      if (a.ram) set.add(a.ram);
+    }
+    return Array.from(set).sort();
+  }, [assets]);
+
   const filtered = useMemo(() => {
     if (!assets) return [];
     return assets.filter((a) => {
@@ -142,6 +163,9 @@ export function InventoryPage({
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       const matchCategory =
         categoryFilter === "all" || a.category === categoryFilter;
+      const matchProcessor =
+        processorFilter === "all" || a.processorType === processorFilter;
+      const matchRam = ramFilter === "all" || a.ram === ramFilter;
       const matchAge = (() => {
         if (ageFilter === "all") return true;
         const pd = Array.isArray(a.purchaseDate)
@@ -159,9 +183,24 @@ export function InventoryPage({
         if (ageFilter === "unknown") return !pd;
         return true;
       })();
-      return matchSearch && matchStatus && matchCategory && matchAge;
+      return (
+        matchSearch &&
+        matchStatus &&
+        matchCategory &&
+        matchAge &&
+        matchProcessor &&
+        matchRam
+      );
     });
-  }, [assets, searchTerm, statusFilter, categoryFilter, ageFilter]);
+  }, [
+    assets,
+    searchTerm,
+    statusFilter,
+    categoryFilter,
+    ageFilter,
+    processorFilter,
+    ramFilter,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -291,6 +330,46 @@ export function InventoryPage({
                 <SelectItem value="unknown">Unknown</SelectItem>
               </SelectContent>
             </Select>
+            {/* Processor filter — populated dynamically from asset data */}
+            <Select
+              value={processorFilter}
+              onValueChange={(v) => {
+                setProcessorFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-44" data-ocid="inventory.select">
+                <SelectValue placeholder="Processor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Processors</SelectItem>
+                {processorOptions.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* RAM filter — populated dynamically from asset data */}
+            <Select
+              value={ramFilter}
+              onValueChange={(v) => {
+                setRamFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-36" data-ocid="inventory.select">
+                <SelectValue placeholder="RAM" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All RAM</SelectItem>
+                {ramOptions.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               onClick={() => {
@@ -298,6 +377,8 @@ export function InventoryPage({
                 setStatusFilter("all");
                 setCategoryFilter("all");
                 setAgeFilter("all");
+                setProcessorFilter("all");
+                setRamFilter("all");
                 setPage(1);
               }}
               data-ocid="inventory.secondary_button"
@@ -416,6 +497,9 @@ export function InventoryPage({
                         Location
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Specs
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Warranty
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -473,6 +557,44 @@ export function InventoryPage({
                           <TableCell className="text-sm text-muted-foreground">
                             {asset.location}
                           </TableCell>
+                          {/* Specs column: Processor / RAM / Storage */}
+                          <TableCell className="text-xs text-muted-foreground min-w-[140px]">
+                            {asset.processorType ||
+                            asset.ram ||
+                            asset.storage ? (
+                              <div className="flex flex-col gap-0.5">
+                                {asset.processorType && (
+                                  <span
+                                    className="truncate max-w-[160px]"
+                                    title={asset.processorType}
+                                  >
+                                    <span className="font-medium text-foreground/70">
+                                      CPU:
+                                    </span>{" "}
+                                    {asset.processorType}
+                                  </span>
+                                )}
+                                {asset.ram && (
+                                  <span>
+                                    <span className="font-medium text-foreground/70">
+                                      RAM:
+                                    </span>{" "}
+                                    {asset.ram}
+                                  </span>
+                                )}
+                                {asset.storage && (
+                                  <span>
+                                    <span className="font-medium text-foreground/70">
+                                      SSD:
+                                    </span>{" "}
+                                    {asset.storage}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span>—</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <WarrantyBadge warrantyDate={asset.warrantyDate} />
                           </TableCell>
@@ -488,7 +610,7 @@ export function InventoryPage({
                             className="text-right"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <span>
