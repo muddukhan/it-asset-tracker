@@ -5,6 +5,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
@@ -15,6 +22,7 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
+  Filter,
   HardDrive,
   Laptop,
   LayoutGrid,
@@ -190,6 +198,10 @@ export function DashboardPage({ onNavigate }: Props) {
     useGetAllSoftware();
   const { currentTheme, setTheme, viewMode, setViewMode } = useTheme();
 
+  // Spec filter state
+  const [processorFilter, setProcessorFilter] = useState<string>("all");
+  const [ramFilter, setRamFilter] = useState<string>("all");
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -197,22 +209,76 @@ export function DashboardPage({ onNavigate }: Props) {
     day: "numeric",
   });
 
-  const retiredCount = useMemo(() => {
-    if (!assets) return 0;
-    return assets.filter((a) => a.status === "Retired").length;
+  // Dynamically build processor and RAM options from assets
+  const processorOptions = useMemo(() => {
+    if (!assets) return [];
+    const seen = new Set<string>();
+    for (const a of assets) {
+      const val = Array.isArray(a.processorType)
+        ? a.processorType[0]
+        : a.processorType;
+      if (val && typeof val === "string" && val.trim()) seen.add(val.trim());
+    }
+    return Array.from(seen).sort();
   }, [assets]);
 
-  const agingAssetsCount = useMemo(() => {
-    if (!assets) return 0;
+  const ramOptions = useMemo(() => {
+    if (!assets) return [];
+    const seen = new Set<string>();
+    for (const a of assets) {
+      const val = Array.isArray(a.ram) ? a.ram[0] : a.ram;
+      if (val && typeof val === "string" && val.trim()) seen.add(val.trim());
+    }
+    return Array.from(seen).sort();
+  }, [assets]);
+
+  // Filtered assets based on spec filters
+  const isSpecFiltered = processorFilter !== "all" || ramFilter !== "all";
+
+  const filteredAssets = useMemo(() => {
+    if (!assets || !isSpecFiltered) return assets ?? [];
     return assets.filter((a) => {
+      const proc = Array.isArray(a.processorType)
+        ? a.processorType[0]
+        : a.processorType;
+      const ram = Array.isArray(a.ram) ? a.ram[0] : a.ram;
+      if (processorFilter !== "all" && proc !== processorFilter) return false;
+      if (ramFilter !== "all" && ram !== ramFilter) return false;
+      return true;
+    });
+  }, [assets, isSpecFiltered, processorFilter, ramFilter]);
+
+  // Source array: filtered or full
+  const sourceAssets = isSpecFiltered ? filteredAssets : (assets ?? []);
+
+  // Stat counts derived from filtered assets when filtering is active
+  const filteredTotal = useMemo(() => sourceAssets.length, [sourceAssets]);
+  const filteredAssigned = useMemo(
+    () => sourceAssets.filter((a) => a.status === "Assigned").length,
+    [sourceAssets],
+  );
+  const filteredInRepair = useMemo(
+    () => sourceAssets.filter((a) => a.status === "In Repair").length,
+    [sourceAssets],
+  );
+  const filteredAvailable = useMemo(
+    () => sourceAssets.filter((a) => a.status === "Available").length,
+    [sourceAssets],
+  );
+
+  const retiredCount = useMemo(() => {
+    return sourceAssets.filter((a) => a.status === "Retired").length;
+  }, [sourceAssets]);
+
+  const agingAssetsCount = useMemo(() => {
+    return sourceAssets.filter((a) => {
       const age = getAgeYears(a.purchaseDate);
       return age !== null && age > 4;
     }).length;
-  }, [assets]);
+  }, [sourceAssets]);
 
   const agingAssets = useMemo(() => {
-    if (!assets) return [];
-    return assets
+    return sourceAssets
       .filter((a) => {
         const age = getAgeYears(a.purchaseDate);
         return age !== null && age > 4;
@@ -223,11 +289,10 @@ export function DashboardPage({ onNavigate }: Props) {
         return ageB - ageA;
       })
       .slice(0, 10);
-  }, [assets]);
+  }, [sourceAssets]);
 
   const warrantyAlerts = useMemo(() => {
-    if (!assets) return [];
-    return assets
+    return sourceAssets
       .filter((a) => {
         const ws = getWarrantyStatus(a.warrantyDate);
         return ws && (ws.variant === "expired" || ws.variant === "warning");
@@ -238,31 +303,28 @@ export function DashboardPage({ onNavigate }: Props) {
         return (wsA?.daysLeft ?? 0) - (wsB?.daysLeft ?? 0);
       })
       .slice(0, 8);
-  }, [assets]);
+  }, [sourceAssets]);
 
   const categoryBreakdown = useMemo(() => {
-    if (!assets) return [];
     const counts: Record<string, number> = {};
-    for (const a of assets) {
+    for (const a of sourceAssets) {
       counts[a.category] = (counts[a.category] ?? 0) + 1;
     }
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([cat, count]) => ({ cat: cat as string, count }));
-  }, [assets]);
+  }, [sourceAssets]);
 
   const hardwareConfigAssets = useMemo(() => {
-    if (!assets) return [];
-    return assets
+    return sourceAssets
       .filter((a) => a.processorType || a.ram || a.storage)
       .slice(0, 5);
-  }, [assets]);
+  }, [sourceAssets]);
 
   // Compute age buckets per category
   const categoryAgeBuckets = useMemo((): Record<string, AgeBucket[]> => {
-    if (!assets) return {};
     const result: Record<string, AgeBucket[]> = {};
-    for (const a of assets) {
+    for (const a of sourceAssets) {
       const cat = a.category as string;
       if (!result[cat]) {
         result[cat] = AGE_BUCKETS_TEMPLATE.map((b) => ({ ...b, count: 0 }));
@@ -278,7 +340,7 @@ export function DashboardPage({ onNavigate }: Props) {
         buckets.some((b) => b.key !== "unknown" && b.count > 0),
       ),
     );
-  }, [assets]);
+  }, [sourceAssets]);
 
   const availableAgeCats = useMemo(
     () => Object.keys(categoryAgeBuckets) as string[],
@@ -456,6 +518,74 @@ export function DashboardPage({ onNavigate }: Props) {
         </div>
       </div>
 
+      {/* Filter Stats bar */}
+      <div
+        className="flex items-center gap-3 flex-wrap p-3 rounded-xl border bg-muted/30"
+        data-ocid="dashboard.panel"
+      >
+        <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground flex-shrink-0">
+          <Filter className="h-3.5 w-3.5" />
+          Filter Stats:
+        </span>
+
+        {/* Processor filter */}
+        <Select value={processorFilter} onValueChange={setProcessorFilter}>
+          <SelectTrigger
+            className="h-8 w-44 text-xs"
+            data-ocid="dashboard.select"
+          >
+            <SelectValue placeholder="All Processors" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Processors</SelectItem>
+            {processorOptions.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* RAM filter */}
+        <Select value={ramFilter} onValueChange={setRamFilter}>
+          <SelectTrigger
+            className="h-8 w-36 text-xs"
+            data-ocid="dashboard.select"
+          >
+            <SelectValue placeholder="All RAM" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All RAM</SelectItem>
+            {ramOptions.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Active filter indicators */}
+        {isSpecFiltered && (
+          <>
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent/15 text-accent-foreground border border-accent/20">
+              Showing {filteredAssets.length} of {assets?.length ?? 0} assets
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground ml-auto"
+              onClick={() => {
+                setProcessorFilter("all");
+                setRamFilter("all");
+              }}
+              data-ocid="dashboard.secondary_button"
+            >
+              Clear Filters
+            </Button>
+          </>
+        )}
+      </div>
+
       {/* KPI cards */}
       <div className={STAT_GRID[viewMode]}>
         {statsLoading || assetsLoading || softwareLoading ? (
@@ -466,7 +596,9 @@ export function DashboardPage({ onNavigate }: Props) {
           <>
             <StatCard
               label="Total Assets"
-              value={stats ? Number(stats.total) : 0}
+              value={
+                isSpecFiltered ? filteredTotal : stats ? Number(stats.total) : 0
+              }
               icon={<Package className="h-5 w-5" />}
               accentColor="oklch(var(--foreground))"
               index={0}
@@ -474,7 +606,13 @@ export function DashboardPage({ onNavigate }: Props) {
             />
             <StatCard
               label="Assigned"
-              value={stats ? Number(stats.assigned) : 0}
+              value={
+                isSpecFiltered
+                  ? filteredAssigned
+                  : stats
+                    ? Number(stats.assigned)
+                    : 0
+              }
               icon={<CheckCircle2 className="h-5 w-5" />}
               accentColor="oklch(var(--status-assigned-text))"
               index={1}
@@ -482,7 +620,13 @@ export function DashboardPage({ onNavigate }: Props) {
             />
             <StatCard
               label="In Repair"
-              value={stats ? Number(stats.inRepair) : 0}
+              value={
+                isSpecFiltered
+                  ? filteredInRepair
+                  : stats
+                    ? Number(stats.inRepair)
+                    : 0
+              }
               icon={<Wrench className="h-5 w-5" />}
               accentColor="oklch(var(--status-inrepair-text))"
               index={2}
@@ -490,7 +634,13 @@ export function DashboardPage({ onNavigate }: Props) {
             />
             <StatCard
               label="Available"
-              value={stats ? Number(stats.available) : 0}
+              value={
+                isSpecFiltered
+                  ? filteredAvailable
+                  : stats
+                    ? Number(stats.available)
+                    : 0
+              }
               icon={<BarChart3 className="h-5 w-5" />}
               accentColor="oklch(var(--status-available-text))"
               index={3}
