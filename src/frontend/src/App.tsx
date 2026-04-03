@@ -12,7 +12,6 @@ import {
   BarChart3,
   Bell,
   ChevronDown,
-  ClipboardList,
   History,
   LayoutDashboard,
   LogOut,
@@ -42,7 +41,6 @@ const queryClient = new QueryClient();
 type NavPage =
   | "dashboard"
   | "inventory"
-  | "assignments"
   | "history"
   | "reports"
   | "admin"
@@ -81,11 +79,6 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
     id: "software",
     label: "Software",
     icon: <Monitor className="h-4 w-4" />,
-  },
-  {
-    id: "assignments",
-    label: "Assignments",
-    icon: <ClipboardList className="h-4 w-4" />,
   },
   { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
   { id: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
@@ -166,10 +159,16 @@ function AppShell() {
         return <DashboardPage onNavigate={navigate} />;
       case "inventory": {
         const isAgeFilter = pageState.filter?.startsWith("age:");
+        const isCatFilter = pageState.filter?.startsWith("cat:");
         return (
           <InventoryPage
             key={pageState.filter}
-            initialStatusFilter={isAgeFilter ? undefined : pageState.filter}
+            initialStatusFilter={
+              isAgeFilter || isCatFilter ? undefined : pageState.filter
+            }
+            initialCategoryFilter={
+              isCatFilter ? pageState.filter?.replace("cat:", "") : undefined
+            }
             initialAgeFilter={
               isAgeFilter ? pageState.filter?.replace("age:", "") : undefined
             }
@@ -177,8 +176,6 @@ function AppShell() {
           />
         );
       }
-      case "assignments":
-        return <InventoryPage key="assigned" initialStatusFilter="assigned" />;
       case "history":
         return (
           <HistoryPage

@@ -177,7 +177,10 @@ export function useUpdateAsset() {
     mutationFn: async ({
       id,
       input,
-    }: { id: number; input: LocalAssetInput & { photoFile?: File } }) => {
+    }: {
+      id: number;
+      input: Partial<LocalAssetInput> & { photoFile?: File };
+    }) => {
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
         photoDataUrl = await fileToBase64(input.photoFile);

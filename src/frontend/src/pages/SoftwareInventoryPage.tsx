@@ -47,6 +47,7 @@ import {
   Search,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
@@ -499,17 +500,44 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                           </TableCell>
                           <TableCell className="text-sm">
                             {(sw as any).invoiceFile ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
-                                onClick={() =>
-                                  window.open((sw as any).invoiceFile, "_blank")
-                                }
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                View
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
+                                  onClick={() =>
+                                    window.open(
+                                      (sw as any).invoiceFile,
+                                      "_blank",
+                                    )
+                                  }
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  disabled={!isAdmin}
+                                  data-ocid="software.delete_button"
+                                  onClick={async () => {
+                                    if (!isAdmin) return;
+                                    await updateSoftware.mutateAsync({
+                                      id: sw.id,
+                                      input: {
+                                        name: sw.name,
+                                        vendor: sw.vendor,
+                                        invoiceFile: undefined,
+                                        invoiceFileName: undefined,
+                                      } as any,
+                                    });
+                                    toast.success("Invoice removed");
+                                  }}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}

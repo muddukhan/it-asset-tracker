@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Image as ImageIcon,
   PackageOpen,
   Pencil,
@@ -33,6 +34,7 @@ import {
   Search,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
@@ -49,6 +51,7 @@ import {
   useDeleteAsset,
   useGetAllAssets,
   useIsCallerAdmin,
+  useUpdateAsset,
 } from "../hooks/useQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
 
@@ -99,6 +102,21 @@ function getWindowsVersions(): Record<string, string> {
   }
 }
 
+function getPurchaseYear(purchaseDate?: string): string {
+  if (!purchaseDate) return "—";
+  const d = new Date(purchaseDate);
+  if (Number.isNaN(d.getTime())) return "—";
+  return String(d.getFullYear());
+}
+
+function getAssetAgeLabel(purchaseDate?: string): string {
+  if (!purchaseDate) return "—";
+  const d = new Date(purchaseDate);
+  if (Number.isNaN(d.getTime())) return "—";
+  const years = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  return `${years.toFixed(1)} yrs`;
+}
+
 export function InventoryPage({
   initialStatusFilter,
   initialCategoryFilter,
@@ -108,6 +126,7 @@ export function InventoryPage({
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: isAdmin } = useIsCallerAdmin();
   const deleteAsset = useDeleteAsset();
+  const updateAsset = useUpdateAsset();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(
@@ -503,13 +522,22 @@ export function InventoryPage({
                         Specs
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                        Warranty
+                        Warranty Status
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Purch. Year
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Age
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Windows Version
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Notes
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                        Invoice
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-right">
                         Actions
@@ -519,6 +547,9 @@ export function InventoryPage({
                   <TableBody>
                     {paginated.map((asset, i) => {
                       const rowIdx = (page - 1) * PAGE_SIZE + i + 1;
+                      const pd = Array.isArray(asset.purchaseDate)
+                        ? asset.purchaseDate[0]
+                        : (asset.purchaseDate as string | undefined);
                       return (
                         <TableRow
                           key={String(asset.id)}
@@ -604,6 +635,14 @@ export function InventoryPage({
                           <TableCell>
                             <WarrantyBadge warrantyDate={asset.warrantyDate} />
                           </TableCell>
+                          {/* Purchase Year column */}
+                          <TableCell className="text-sm text-muted-foreground">
+                            {getPurchaseYear(pd)}
+                          </TableCell>
+                          {/* Age column */}
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {getAssetAgeLabel(pd)}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {windowsVersions[asset.serialNumber] || "—"}
                           </TableCell>
@@ -611,6 +650,52 @@ export function InventoryPage({
                             <span className="truncate block">
                               {(asset as any).notes || "—"}
                             </span>
+                          </TableCell>
+                          {/* Invoice column */}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {(asset as any).invoiceFile ? (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() =>
+                                    window.open(
+                                      (asset as any).invoiceFile,
+                                      "_blank",
+                                    )
+                                  }
+                                  data-ocid={`inventory.secondary_button.${rowIdx}`}
+                                >
+                                  <FileText className="h-3.5 w-3.5 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  disabled={!isAdmin}
+                                  onClick={async () => {
+                                    if (!isAdmin) return;
+                                    await updateAsset.mutateAsync({
+                                      id: asset.id,
+                                      input: {
+                                        invoiceFile: undefined,
+                                        invoiceFileName: undefined,
+                                      },
+                                    });
+                                    toast.success("Invoice removed");
+                                  }}
+                                  data-ocid={`inventory.delete_button.${rowIdx}`}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell
                             className="text-right"

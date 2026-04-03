@@ -19,11 +19,13 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Cpu,
+  FileText,
   HardDrive,
   Image as ImageIcon,
   Loader2,
   MemoryStick,
   Monitor,
+  Paperclip,
   Upload,
   X,
 } from "lucide-react";
@@ -76,6 +78,8 @@ type FormState = {
   assetTag: string;
   vendorName: string;
   invoiceNumber: string;
+  invoiceFile: string;
+  invoiceFileName: string;
 };
 
 const defaultForm: FormState = {
@@ -96,6 +100,8 @@ const defaultForm: FormState = {
   assetTag: "",
   vendorName: "",
   invoiceNumber: "",
+  invoiceFile: "",
+  invoiceFileName: "",
 };
 
 function getWindowsVersions(): Record<string, string> {
@@ -112,6 +118,7 @@ export function AssetModal({ open, onClose, asset }: Props) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const invoiceFileRef = useRef<HTMLInputElement>(null);
   const addAsset = useAddAsset();
   const updateAsset = useUpdateAsset();
 
@@ -137,6 +144,8 @@ export function AssetModal({ open, onClose, asset }: Props) {
         assetTag: asset.assetTag ?? "",
         vendorName: asset.vendorName ?? "",
         invoiceNumber: asset.invoiceNumber ?? "",
+        invoiceFile: (asset as any).invoiceFile ?? "",
+        invoiceFileName: (asset as any).invoiceFileName ?? "",
       });
       setExistingPhotoUrl(asset.photoDataUrl ?? null);
     } else {
@@ -172,6 +181,36 @@ export function AssetModal({ open, onClose, asset }: Props) {
     setPhotoPreview(url);
   };
 
+  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if (!allowed.includes(file.type)) {
+      toast.error("Only PDF, image, or Word documents allowed");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File must be under 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setForm((f) => ({
+        ...f,
+        invoiceFile: ev.target?.result as string,
+        invoiceFileName: file.name,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const input = {
@@ -191,6 +230,8 @@ export function AssetModal({ open, onClose, asset }: Props) {
       assetTag: form.assetTag || undefined,
       vendorName: form.vendorName || undefined,
       invoiceNumber: form.invoiceNumber || undefined,
+      invoiceFile: form.invoiceFile || undefined,
+      invoiceFileName: form.invoiceFileName || undefined,
       photoDataUrl: existingPhotoUrl ?? undefined,
       photoFile: photoFile ?? undefined,
     };
@@ -529,6 +570,72 @@ export function AssetModal({ open, onClose, asset }: Props) {
                   data-ocid="asset.input"
                 />
               </div>
+            </div>
+
+            {/* Attach Invoice */}
+            <div className="space-y-2">
+              <Label>
+                <span className="flex items-center gap-1.5">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  Attach Invoice
+                </span>
+              </Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                {form.invoiceFile && form.invoiceFileName && (
+                  <div className="flex items-center gap-2 flex-1 min-w-0 rounded-md border px-3 py-1.5 bg-muted/40">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground truncate flex-1">
+                      {form.invoiceFileName}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs flex-shrink-0"
+                      onClick={() => window.open(form.invoiceFile, "_blank")}
+                      data-ocid="asset.secondary_button"
+                    >
+                      View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs flex-shrink-0 text-destructive hover:text-destructive"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          invoiceFile: "",
+                          invoiceFileName: "",
+                        }))
+                      }
+                      data-ocid="asset.delete_button"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+                <input
+                  ref={invoiceFileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                  className="hidden"
+                  onChange={handleInvoiceFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => invoiceFileRef.current?.click()}
+                  data-ocid="asset.upload_button"
+                >
+                  <Paperclip className="h-3.5 w-3.5 mr-1.5" />
+                  {form.invoiceFile ? "Replace File" : "Choose File"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                PDF, image, or Word doc — max 5MB
+              </p>
             </div>
           </div>
 

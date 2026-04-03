@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   AlignJustify,
@@ -32,6 +33,7 @@ import {
   Package,
   Palette,
   Printer,
+  RefreshCw,
   Server,
   ShieldAlert,
   Wrench,
@@ -192,6 +194,17 @@ const PANELS_GRID: Record<ViewMode, string> = {
 type Props = { onNavigate?: (page: string, filter?: string) => void };
 
 export function DashboardPage({ onNavigate }: Props) {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ["assets"] });
+    await queryClient.invalidateQueries({ queryKey: ["stats"] });
+    await queryClient.invalidateQueries({ queryKey: ["software"] });
+    setIsRefreshing(false);
+  };
+
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
   const { data: stats, isLoading: statsLoading } = useGetStats();
   const { data: softwareList, isLoading: softwareLoading } =
@@ -201,6 +214,44 @@ export function DashboardPage({ onNavigate }: Props) {
   // Spec filter state
   const [processorFilter, setProcessorFilter] = useState<string>("all");
   const [ramFilter, setRamFilter] = useState<string>("all");
+
+  // Panel visibility state
+  type PanelVisibility = {
+    warrantyAlerts: boolean;
+    categoryBreakdown: boolean;
+    ageAlerts: boolean;
+    softwareLicenseAlerts: boolean;
+    hardwareSpecs: boolean;
+    assetAgeByCategory: boolean;
+  };
+
+  const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
+    warrantyAlerts: true,
+    categoryBreakdown: true,
+    ageAlerts: true,
+    softwareLicenseAlerts: true,
+    hardwareSpecs: true,
+    assetAgeByCategory: true,
+  };
+
+  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(
+    () => {
+      try {
+        const stored = localStorage.getItem("dashboard_panel_visibility");
+        if (stored)
+          return { ...DEFAULT_PANEL_VISIBILITY, ...JSON.parse(stored) };
+      } catch {}
+      return DEFAULT_PANEL_VISIBILITY;
+    },
+  );
+
+  const togglePanel = (key: keyof PanelVisibility) => {
+    setPanelVisibility((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem("dashboard_panel_visibility", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -493,6 +544,21 @@ export function DashboardPage({ onNavigate }: Props) {
             </PopoverContent>
           </Popover>
 
+          {/* Refresh button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            data-ocid="dashboard.secondary_button"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5${isRefreshing ? " animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+
           {/* View mode toggle */}
           <div
             className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5"
@@ -515,6 +581,62 @@ export function DashboardPage({ onNavigate }: Props) {
               </button>
             ))}
           </div>
+
+          {/* Customize panels */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                data-ocid="dashboard.open_modal_button"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Customize
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-56 p-3"
+              data-ocid="dashboard.popover"
+            >
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                Dashboard Panels
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {(
+                  [
+                    { key: "warrantyAlerts", label: "Warranty Alerts" },
+                    { key: "categoryBreakdown", label: "Assets by Category" },
+                    { key: "ageAlerts", label: "Age Alerts" },
+                    {
+                      key: "softwareLicenseAlerts",
+                      label: "Software License Alerts",
+                    },
+                    { key: "hardwareSpecs", label: "Hardware Specs" },
+                    {
+                      key: "assetAgeByCategory",
+                      label: "Asset Age by Category",
+                    },
+                  ] as { key: keyof PanelVisibility; label: string }[]
+                ).map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-muted text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={panelVisibility[key]}
+                      onChange={() => togglePanel(key)}
+                      className="rounded"
+                      data-ocid="dashboard.checkbox"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -706,80 +828,55 @@ export function DashboardPage({ onNavigate }: Props) {
 
       <div className={PANELS_GRID[viewMode]}>
         {/* Warranty alerts */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.35 }}
-          className="rounded-xl border shadow-card bg-card overflow-hidden"
-        >
-          <div className="px-5 py-4 border-b flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-destructive" />
-            <h2 className="font-semibold text-base text-foreground">
-              Warranty Alerts
-            </h2>
-            {warrantyAlerts.length > 0 && (
-              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
-                {warrantyAlerts.length}
-              </span>
-            )}
-          </div>
-          {assetsLoading ? (
-            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-              {["w1", "w2", "w3"].map((k) => (
-                <Skeleton key={k} className="h-12 w-full" />
-              ))}
+        {panelVisibility.warrantyAlerts && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.35 }}
+            className="rounded-xl border shadow-card bg-card overflow-hidden"
+          >
+            <div className="px-5 py-4 border-b flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-destructive" />
+              <h2 className="font-semibold text-base text-foreground">
+                Warranty Alerts
+              </h2>
+              {warrantyAlerts.length > 0 && (
+                <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
+                  {warrantyAlerts.length}
+                </span>
+              )}
             </div>
-          ) : warrantyAlerts.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center py-12 gap-2"
-              data-ocid="dashboard.empty_state"
-            >
-              <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                All warranties are up to date
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {warrantyAlerts.map((asset, i) => {
-                const ws = getWarrantyStatus(asset.warrantyDate);
-                return (
-                  <li
-                    key={String(asset.id)}
-                    className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
-                    data-ocid={`dashboard.item.${i + 1}`}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{
-                        backgroundColor:
-                          ws?.variant === "expired"
-                            ? "oklch(var(--status-inrepair-bg))"
-                            : "oklch(var(--status-instorage-bg))",
-                        color:
-                          ws?.variant === "expired"
-                            ? "oklch(var(--status-inrepair-text))"
-                            : "oklch(var(--status-instorage-text))",
-                      }}
+            {assetsLoading ? (
+              <div
+                className="p-5 space-y-3"
+                data-ocid="dashboard.loading_state"
+              >
+                {["w1", "w2", "w3"].map((k) => (
+                  <Skeleton key={k} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : warrantyAlerts.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center py-12 gap-2"
+                data-ocid="dashboard.empty_state"
+              >
+                <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  All warranties are up to date
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {warrantyAlerts.map((asset, i) => {
+                  const ws = getWarrantyStatus(asset.warrantyDate);
+                  return (
+                    <li
+                      key={String(asset.id)}
+                      className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
+                      data-ocid={`dashboard.item.${i + 1}`}
                     >
-                      {ws?.variant === "expired" ? (
-                        <AlertTriangle className="h-4 w-4" />
-                      ) : (
-                        <Clock className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {asset.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Warranty: {asset.warrantyDate}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <StatusBadge status={asset.status} />
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{
                           backgroundColor:
                             ws?.variant === "expired"
@@ -791,535 +888,613 @@ export function DashboardPage({ onNavigate }: Props) {
                               : "oklch(var(--status-instorage-text))",
                         }}
                       >
-                        {ws?.label}
-                      </span>
+                        {ws?.variant === "expired" ? (
+                          <AlertTriangle className="h-4 w-4" />
+                        ) : (
+                          <Clock className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {asset.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Warranty: {asset.warrantyDate}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <StatusBadge status={asset.status} />
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor:
+                              ws?.variant === "expired"
+                                ? "oklch(var(--status-inrepair-bg))"
+                                : "oklch(var(--status-instorage-bg))",
+                            color:
+                              ws?.variant === "expired"
+                                ? "oklch(var(--status-inrepair-text))"
+                                : "oklch(var(--status-instorage-text))",
+                          }}
+                        >
+                          {ws?.label}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7 px-2 flex-shrink-0"
+                        onClick={() =>
+                          onNavigate?.("inventory", `cat:${asset.category}`)
+                        }
+                        data-ocid="dashboard.secondary_button"
+                      >
+                        View
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </motion.div>
+        )}
+
+        {/* Category breakdown */}
+        {panelVisibility.categoryBreakdown && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.35 }}
+            className="rounded-xl border shadow-card bg-card overflow-hidden"
+          >
+            <div className="px-5 py-4 border-b flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-semibold text-base text-foreground">
+                Assets by Category
+              </h2>
+            </div>
+            {assetsLoading ? (
+              <div className="p-5 space-y-3">
+                {["c1", "c2", "c3"].map((k) => (
+                  <Skeleton key={k} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : categoryBreakdown.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <Package className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No assets yet</p>
+              </div>
+            ) : (
+              <div className="p-5 space-y-3">
+                {categoryBreakdown.map(({ cat, count }) => (
+                  <div key={cat} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted text-muted-foreground flex-shrink-0">
+                      {categoryIcons[cat]}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-foreground capitalize">
+                          {cat}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          {count}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${(count / maxCategoryCount) * 100}%`,
+                            backgroundColor: "oklch(var(--accent))",
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2 flex-shrink-0"
+                      onClick={() => onNavigate?.("inventory", `cat:${cat}`)}
+                    >
+                      View
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Age Alerts Panel */}
+      {panelVisibility.ageAlerts && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.27, duration: 0.35 }}
+          className="rounded-xl border border-amber-200 shadow-card bg-card overflow-hidden dark:border-amber-800"
+        >
+          <div
+            className="px-5 py-4 border-b border-amber-200 dark:border-amber-800 flex items-center gap-2"
+            style={{ backgroundColor: "rgb(255 251 235)" }}
+          >
+            <AlertTriangle className="h-4 w-4" style={{ color: "#d97706" }} />
+            <h2
+              className="font-semibold text-base"
+              style={{ color: "#92400e" }}
+            >
+              Age Alerts
+            </h2>
+            <span className="text-xs" style={{ color: "#b45309" }}>
+              Assets older than 4 years
+            </span>
+            {agingAssets.length > 0 && (
+              <span
+                className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: "#fde68a", color: "#92400e" }}
+              >
+                {agingAssetsCount}
+              </span>
+            )}
+          </div>
+          {assetsLoading ? (
+            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+              {["ag1", "ag2", "ag3"].map((k) => (
+                <Skeleton key={k} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : agingAssets.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-10 gap-2"
+              data-ocid="dashboard.empty_state"
+            >
+              <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No assets older than 4 years
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {agingAssets.map((asset, i) => {
+                const ageYears = getAgeYears(asset.purchaseDate);
+                const ageLabel =
+                  ageYears !== null ? `${ageYears.toFixed(1)} yrs` : "Unknown";
+                return (
+                  <li
+                    key={String(asset.id)}
+                    className="px-5 py-3 flex items-center gap-3 hover:bg-amber-50/50 transition-colors"
+                    data-ocid={`dashboard.item.${i + 1}`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: "#fde68a", color: "#92400e" }}
+                    >
+                      {categorySmallIcons[asset.category]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {asset.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {asset.category}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-xs flex-shrink-0"
+                      style={{
+                        borderColor: "#f59e0b",
+                        color: "#92400e",
+                        backgroundColor: "#fef3c7",
+                      }}
+                    >
+                      {ageLabel}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2 flex-shrink-0"
+                      onClick={() =>
+                        onNavigate?.("inventory", `cat:${asset.category}`)
+                      }
+                      data-ocid="dashboard.secondary_button"
+                    >
+                      View
+                    </Button>
                   </li>
                 );
               })}
             </ul>
           )}
         </motion.div>
+      )}
 
-        {/* Category breakdown */}
+      {/* Software License Alerts Panel */}
+      {panelVisibility.softwareLicenseAlerts && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22, duration: 0.35 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+          className="rounded-xl border shadow-card bg-card overflow-hidden"
+          data-ocid="dashboard.software_expiry_alerts"
+        >
+          <div
+            className="px-5 py-4 border-b flex items-center gap-2"
+            style={{
+              backgroundColor:
+                softwareAtRiskCount > 0
+                  ? softwareExpired.length > 0
+                    ? "rgb(254 242 242)"
+                    : "rgb(255 251 235)"
+                  : undefined,
+              borderBottomColor:
+                softwareAtRiskCount > 0
+                  ? softwareExpired.length > 0
+                    ? "#fecaca"
+                    : "#fde68a"
+                  : undefined,
+            }}
+          >
+            <Package
+              className="h-4 w-4"
+              style={{
+                color:
+                  softwareAtRiskCount > 0
+                    ? softwareExpired.length > 0
+                      ? "#dc2626"
+                      : "#d97706"
+                    : undefined,
+              }}
+            />
+            <h2
+              className="font-semibold text-base"
+              style={{
+                color:
+                  softwareAtRiskCount > 0
+                    ? softwareExpired.length > 0
+                      ? "#991b1b"
+                      : "#92400e"
+                    : undefined,
+              }}
+            >
+              Software License Alerts
+            </h2>
+            <span
+              className="text-xs text-muted-foreground"
+              style={{
+                color:
+                  softwareAtRiskCount > 0
+                    ? softwareExpired.length > 0
+                      ? "#b91c1c"
+                      : "#b45309"
+                    : undefined,
+              }}
+            >
+              Expired or expiring within 90 days
+            </span>
+            {softwareAtRiskCount > 0 && (
+              <span
+                className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{
+                  backgroundColor:
+                    softwareExpired.length > 0 ? "#fecaca" : "#fde68a",
+                  color: softwareExpired.length > 0 ? "#991b1b" : "#92400e",
+                }}
+              >
+                {softwareAtRiskCount}
+              </span>
+            )}
+          </div>
+
+          {softwareLoading ? (
+            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+              {["sl1", "sl2", "sl3"].map((k) => (
+                <Skeleton key={k} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : softwareAtRisk.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-10 gap-2"
+              data-ocid="dashboard.empty_state"
+            >
+              <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                All licenses are up to date
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {softwareAtRisk.map((sw, i) => {
+                const expiryStr = Array.isArray(sw.licenseExpiry)
+                  ? sw.licenseExpiry[0]
+                  : sw.licenseExpiry;
+                const expiryDate = expiryStr ? new Date(expiryStr) : null;
+                const daysUntil = expiryDate
+                  ? Math.floor(
+                      (expiryDate.getTime() - Date.now()) /
+                        (1000 * 60 * 60 * 24),
+                    )
+                  : null;
+
+                let badgeLabel = "";
+                let badgeBg = "";
+                let badgeColor = "";
+
+                if (daysUntil !== null && daysUntil < 0) {
+                  badgeLabel = "Expired";
+                  badgeBg = "#fecaca";
+                  badgeColor = "#991b1b";
+                } else if (daysUntil !== null && daysUntil <= 30) {
+                  badgeLabel = "Expiring Soon";
+                  badgeBg = "#fde68a";
+                  badgeColor = "#92400e";
+                } else if (daysUntil !== null) {
+                  badgeLabel = `Expiring in ${daysUntil}d`;
+                  badgeBg = "#fef9c3";
+                  badgeColor = "#713f12";
+                }
+
+                return (
+                  <li
+                    key={String(sw.id)}
+                    className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
+                    data-ocid={`dashboard.item.${i + 1}`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: badgeBg, color: badgeColor }}
+                    >
+                      <Package className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {sw.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sw.vendor && <span>{sw.vendor}</span>}
+                        {expiryDate && (
+                          <span className={sw.vendor ? " \u00b7 " : ""}>
+                            Expires: {expiryDate.toLocaleDateString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-xs flex-shrink-0"
+                      style={{
+                        borderColor: badgeBg,
+                        backgroundColor: badgeBg,
+                        color: badgeColor,
+                      }}
+                    >
+                      {badgeLabel}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2 flex-shrink-0"
+                      onClick={() => onNavigate?.("software")}
+                      data-ocid="dashboard.secondary_button"
+                    >
+                      View
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </motion.div>
+      )}
+
+      {/* Hardware Configs panel */}
+      {panelVisibility.hardwareSpecs && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.33, duration: 0.35 }}
           className="rounded-xl border shadow-card bg-card overflow-hidden"
         >
           <div className="px-5 py-4 border-b flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <Cpu className="h-4 w-4 text-muted-foreground" />
             <h2 className="font-semibold text-base text-foreground">
-              Assets by Category
+              Asset Hardware Specs
             </h2>
+            <span className="ml-auto text-xs text-muted-foreground">
+              Assets with configuration details
+            </span>
           </div>
           {assetsLoading ? (
-            <div className="p-5 space-y-3">
-              {["c1", "c2", "c3"].map((k) => (
+            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+              {["h1", "h2", "h3"].map((k) => (
+                <Skeleton key={k} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : hardwareConfigAssets.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-10 gap-2"
+              data-ocid="dashboard.empty_state"
+            >
+              <Cpu className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No hardware specs added yet. Edit an asset to add processor,
+                RAM, and storage info.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {hardwareConfigAssets.map((asset, i) => {
+                return (
+                  <li
+                    key={String(asset.id)}
+                    className="px-5 py-3 flex items-center gap-4 hover:bg-muted/20 transition-colors"
+                    data-ocid={`dashboard.item.${i + 1}`}
+                  >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground">
+                      {categoryIcons[asset.category]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {asset.name}
+                        </p>
+                        <StatusBadge status={asset.status} />
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                        {asset.processorType && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Cpu className="h-3 w-3" />
+                            {asset.processorType}
+                          </span>
+                        )}
+                        {asset.ram && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MemoryStick className="h-3 w-3" />
+                            {asset.ram}
+                          </span>
+                        )}
+                        {asset.storage && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <HardDrive className="h-3 w-3" />
+                            {asset.storage}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground capitalize flex-shrink-0">
+                      {asset.category}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2 flex-shrink-0"
+                      onClick={() =>
+                        onNavigate?.("inventory", `cat:${asset.category}`)
+                      }
+                      data-ocid="dashboard.secondary_button"
+                    >
+                      View
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </motion.div>
+      )}
+
+      {/* Asset Age by Category panel */}
+      {panelVisibility.assetAgeByCategory && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.36, duration: 0.35 }}
+          className="rounded-xl border shadow-card bg-card overflow-hidden"
+        >
+          <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-semibold text-base text-foreground">
+              Asset Age by Category
+            </h2>
+            {activeCat && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {totalActiveCat} asset{totalActiveCat !== 1 ? "s" : ""} with
+                purchase date
+              </span>
+            )}
+          </div>
+
+          {assetsLoading ? (
+            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
+              {["a1", "a2", "a3"].map((k) => (
                 <Skeleton key={k} className="h-10 w-full" />
               ))}
             </div>
-          ) : categoryBreakdown.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <Package className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No assets yet</p>
+          ) : availableAgeCats.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-10 gap-2"
+              data-ocid="dashboard.empty_state"
+            >
+              <BarChart3 className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No assets with purchase dates found
+              </p>
             </div>
           ) : (
-            <div className="p-5 space-y-3">
-              {categoryBreakdown.map(({ cat, count }) => (
-                <div key={cat} className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted text-muted-foreground flex-shrink-0">
-                    {categoryIcons[cat]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-foreground capitalize">
-                        {cat}
-                      </span>
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        {count}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${(count / maxCategoryCount) * 100}%`,
-                          backgroundColor: "oklch(var(--accent))",
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7 px-2 flex-shrink-0"
-                    onClick={() => onNavigate?.("inventory", cat)}
+            <div>
+              {/* Category tabs */}
+              <div className="px-5 pt-4 pb-2 flex gap-2 flex-wrap border-b">
+                {availableAgeCats.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedAgeCat(cat)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                      activeCat === cat
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                    }`}
+                    data-ocid="dashboard.tab"
                   >
-                    View
-                  </Button>
-                </div>
-              ))}
+                    <span className="opacity-80">
+                      {categorySmallIcons[cat as string]}
+                    </span>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Buckets */}
+              <div className="p-5 space-y-3">
+                {activeBuckets.map((bucket) => (
+                  <div key={bucket.key} className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <span className="text-sm font-medium text-foreground">
+                        {bucket.label}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden mr-3">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${(bucket.count / maxBucketCount) * 100}%`,
+                              backgroundColor:
+                                bucket.key === "unknown"
+                                  ? "oklch(var(--muted-foreground))"
+                                  : bucket.key === "gt5" ||
+                                      bucket.key === "3to5"
+                                    ? "#f59e0b"
+                                    : "oklch(var(--accent))",
+                              opacity: bucket.key === "unknown" ? 0.5 : 1,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-muted-foreground w-5 text-right flex-shrink-0">
+                          {bucket.count}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2 flex-shrink-0"
+                      disabled={bucket.count === 0}
+                      onClick={() =>
+                        onNavigate?.("inventory", `age:${bucket.key}`)
+                      }
+                      data-ocid="dashboard.secondary_button"
+                    >
+                      View
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </motion.div>
-      </div>
-
-      {/* Age Alerts Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.27, duration: 0.35 }}
-        className="rounded-xl border border-amber-200 shadow-card bg-card overflow-hidden dark:border-amber-800"
-      >
-        <div
-          className="px-5 py-4 border-b border-amber-200 dark:border-amber-800 flex items-center gap-2"
-          style={{ backgroundColor: "rgb(255 251 235)" }}
-        >
-          <AlertTriangle className="h-4 w-4" style={{ color: "#d97706" }} />
-          <h2 className="font-semibold text-base" style={{ color: "#92400e" }}>
-            Age Alerts
-          </h2>
-          <span className="text-xs" style={{ color: "#b45309" }}>
-            Assets older than 4 years
-          </span>
-          {agingAssets.length > 0 && (
-            <span
-              className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: "#fde68a", color: "#92400e" }}
-            >
-              {agingAssetsCount}
-            </span>
-          )}
-        </div>
-        {assetsLoading ? (
-          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-            {["ag1", "ag2", "ag3"].map((k) => (
-              <Skeleton key={k} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : agingAssets.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-10 gap-2"
-            data-ocid="dashboard.empty_state"
-          >
-            <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              No assets older than 4 years
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {agingAssets.map((asset, i) => {
-              const ageYears = getAgeYears(asset.purchaseDate);
-              const ageLabel =
-                ageYears !== null ? `${ageYears.toFixed(1)} yrs` : "Unknown";
-              return (
-                <li
-                  key={String(asset.id)}
-                  className="px-5 py-3 flex items-center gap-3 hover:bg-amber-50/50 transition-colors"
-                  data-ocid={`dashboard.item.${i + 1}`}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: "#fde68a", color: "#92400e" }}
-                  >
-                    {categorySmallIcons[asset.category]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {asset.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {asset.category}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-xs flex-shrink-0"
-                    style={{
-                      borderColor: "#f59e0b",
-                      color: "#92400e",
-                      backgroundColor: "#fef3c7",
-                    }}
-                  >
-                    {ageLabel}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7 px-2 flex-shrink-0"
-                    onClick={() => onNavigate?.("inventory", asset.category)}
-                    data-ocid="dashboard.secondary_button"
-                  >
-                    View
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </motion.div>
-
-      {/* Software License Alerts Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.35 }}
-        className="rounded-xl border shadow-card bg-card overflow-hidden"
-        data-ocid="dashboard.software_expiry_alerts"
-      >
-        <div
-          className="px-5 py-4 border-b flex items-center gap-2"
-          style={{
-            backgroundColor:
-              softwareAtRiskCount > 0
-                ? softwareExpired.length > 0
-                  ? "rgb(254 242 242)"
-                  : "rgb(255 251 235)"
-                : undefined,
-            borderBottomColor:
-              softwareAtRiskCount > 0
-                ? softwareExpired.length > 0
-                  ? "#fecaca"
-                  : "#fde68a"
-                : undefined,
-          }}
-        >
-          <Package
-            className="h-4 w-4"
-            style={{
-              color:
-                softwareAtRiskCount > 0
-                  ? softwareExpired.length > 0
-                    ? "#dc2626"
-                    : "#d97706"
-                  : undefined,
-            }}
-          />
-          <h2
-            className="font-semibold text-base"
-            style={{
-              color:
-                softwareAtRiskCount > 0
-                  ? softwareExpired.length > 0
-                    ? "#991b1b"
-                    : "#92400e"
-                  : undefined,
-            }}
-          >
-            Software License Alerts
-          </h2>
-          <span
-            className="text-xs text-muted-foreground"
-            style={{
-              color:
-                softwareAtRiskCount > 0
-                  ? softwareExpired.length > 0
-                    ? "#b91c1c"
-                    : "#b45309"
-                  : undefined,
-            }}
-          >
-            Expired or expiring within 90 days
-          </span>
-          {softwareAtRiskCount > 0 && (
-            <span
-              className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor:
-                  softwareExpired.length > 0 ? "#fecaca" : "#fde68a",
-                color: softwareExpired.length > 0 ? "#991b1b" : "#92400e",
-              }}
-            >
-              {softwareAtRiskCount}
-            </span>
-          )}
-        </div>
-
-        {softwareLoading ? (
-          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-            {["sl1", "sl2", "sl3"].map((k) => (
-              <Skeleton key={k} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : softwareAtRisk.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-10 gap-2"
-            data-ocid="dashboard.empty_state"
-          >
-            <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              All licenses are up to date
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {softwareAtRisk.map((sw, i) => {
-              const expiryStr = Array.isArray(sw.licenseExpiry)
-                ? sw.licenseExpiry[0]
-                : sw.licenseExpiry;
-              const expiryDate = expiryStr ? new Date(expiryStr) : null;
-              const daysUntil = expiryDate
-                ? Math.floor(
-                    (expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-                  )
-                : null;
-
-              let badgeLabel = "";
-              let badgeBg = "";
-              let badgeColor = "";
-
-              if (daysUntil !== null && daysUntil < 0) {
-                badgeLabel = "Expired";
-                badgeBg = "#fecaca";
-                badgeColor = "#991b1b";
-              } else if (daysUntil !== null && daysUntil <= 30) {
-                badgeLabel = "Expiring Soon";
-                badgeBg = "#fde68a";
-                badgeColor = "#92400e";
-              } else if (daysUntil !== null) {
-                badgeLabel = `Expiring in ${daysUntil}d`;
-                badgeBg = "#fef9c3";
-                badgeColor = "#713f12";
-              }
-
-              return (
-                <li
-                  key={String(sw.id)}
-                  className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
-                  data-ocid={`dashboard.item.${i + 1}`}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: badgeBg, color: badgeColor }}
-                  >
-                    <Package className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {sw.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {sw.vendor && <span>{sw.vendor}</span>}
-                      {expiryDate && (
-                        <span className={sw.vendor ? " \u00b7 " : ""}>
-                          Expires: {expiryDate.toLocaleDateString()}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-xs flex-shrink-0"
-                    style={{
-                      borderColor: badgeBg,
-                      backgroundColor: badgeBg,
-                      color: badgeColor,
-                    }}
-                  >
-                    {badgeLabel}
-                  </Badge>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </motion.div>
-
-      {/* Hardware Configs panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.33, duration: 0.35 }}
-        className="rounded-xl border shadow-card bg-card overflow-hidden"
-      >
-        <div className="px-5 py-4 border-b flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-semibold text-base text-foreground">
-            Asset Hardware Specs
-          </h2>
-          <span className="ml-auto text-xs text-muted-foreground">
-            Assets with configuration details
-          </span>
-        </div>
-        {assetsLoading ? (
-          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-            {["h1", "h2", "h3"].map((k) => (
-              <Skeleton key={k} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : hardwareConfigAssets.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-10 gap-2"
-            data-ocid="dashboard.empty_state"
-          >
-            <Cpu className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              No hardware specs added yet. Edit an asset to add processor, RAM,
-              and storage info.
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {hardwareConfigAssets.map((asset, i) => {
-              return (
-                <li
-                  key={String(asset.id)}
-                  className="px-5 py-3 flex items-center gap-4 hover:bg-muted/20 transition-colors"
-                  data-ocid={`dashboard.item.${i + 1}`}
-                >
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground">
-                    {categoryIcons[asset.category]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {asset.name}
-                      </p>
-                      <StatusBadge status={asset.status} />
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      {asset.processorType && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Cpu className="h-3 w-3" />
-                          {asset.processorType}
-                        </span>
-                      )}
-                      {asset.ram && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MemoryStick className="h-3 w-3" />
-                          {asset.ram}
-                        </span>
-                      )}
-                      {asset.storage && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <HardDrive className="h-3 w-3" />
-                          {asset.storage}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground capitalize flex-shrink-0">
-                    {asset.category}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </motion.div>
-
-      {/* Asset Age by Category panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.36, duration: 0.35 }}
-        className="rounded-xl border shadow-card bg-card overflow-hidden"
-      >
-        <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap">
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-semibold text-base text-foreground">
-            Asset Age by Category
-          </h2>
-          {activeCat && (
-            <span className="ml-auto text-xs text-muted-foreground">
-              {totalActiveCat} asset{totalActiveCat !== 1 ? "s" : ""} with
-              purchase date
-            </span>
-          )}
-        </div>
-
-        {assetsLoading ? (
-          <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-            {["a1", "a2", "a3"].map((k) => (
-              <Skeleton key={k} className="h-10 w-full" />
-            ))}
-          </div>
-        ) : availableAgeCats.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-10 gap-2"
-            data-ocid="dashboard.empty_state"
-          >
-            <BarChart3 className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              No assets with purchase dates found
-            </p>
-          </div>
-        ) : (
-          <div>
-            {/* Category tabs */}
-            <div className="px-5 pt-4 pb-2 flex gap-2 flex-wrap border-b">
-              {availableAgeCats.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedAgeCat(cat)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                    activeCat === cat
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                  }`}
-                  data-ocid="dashboard.tab"
-                >
-                  <span className="opacity-80">
-                    {categorySmallIcons[cat as string]}
-                  </span>
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Buckets */}
-            <div className="p-5 space-y-3">
-              {activeBuckets.map((bucket) => (
-                <div key={bucket.key} className="flex items-center gap-3">
-                  <div className="w-28 flex-shrink-0">
-                    <span className="text-sm font-medium text-foreground">
-                      {bucket.label}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden mr-3">
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{
-                            width: `${(bucket.count / maxBucketCount) * 100}%`,
-                            backgroundColor:
-                              bucket.key === "unknown"
-                                ? "oklch(var(--muted-foreground))"
-                                : bucket.key === "gt5" || bucket.key === "3to5"
-                                  ? "#f59e0b"
-                                  : "oklch(var(--accent))",
-                            opacity: bucket.key === "unknown" ? 0.5 : 1,
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-muted-foreground w-5 text-right flex-shrink-0">
-                        {bucket.count}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7 px-2 flex-shrink-0"
-                    disabled={bucket.count === 0}
-                    onClick={() =>
-                      onNavigate?.("inventory", `age:${bucket.key}`)
-                    }
-                    data-ocid="dashboard.secondary_button"
-                  >
-                    View
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </motion.div>
+      )}
     </div>
   );
 }

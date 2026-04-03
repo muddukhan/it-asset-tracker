@@ -26,6 +26,8 @@ export type LocalAsset = {
   assetTag?: string;
   vendorName?: string;
   invoiceNumber?: string;
+  invoiceFile?: string;
+  invoiceFileName?: string;
   photoDataUrl?: string;
   retired?: boolean;
   createdAt: number;
@@ -301,7 +303,7 @@ export const localDB = {
     return asset;
   },
 
-  updateAsset(id: number, input: LocalAssetInput): LocalAsset | null {
+  updateAsset(id: number, input: Partial<LocalAssetInput>): LocalAsset | null {
     const assets = readAssets();
     const idx = assets.findIndex((a) => a.id === id);
     if (idx === -1) return null;

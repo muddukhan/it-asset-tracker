@@ -134,6 +134,7 @@ function exportHardwareCSV(assets: Asset[]) {
     "Warranty Status",
     "Vendor Name",
     "Invoice Number",
+    "Has Invoice",
     "Processor",
     "RAM",
     "Storage",
@@ -154,6 +155,7 @@ function exportHardwareCSV(assets: Asset[]) {
     getWarrantyStatus(a.warrantyDate as string | null | undefined),
     (a as any).vendorName ?? "",
     (a as any).invoiceNumber ?? "",
+    (a as any).invoiceFile ? "Yes" : "No",
     (a.processorType as string | undefined) ?? "",
     (a.ram as string | undefined) ?? "",
     (a.storage as string | undefined) ?? "",
@@ -199,6 +201,7 @@ function exportSoftwareCSV(software: StoreSoftware[]) {
     "License Type",
     "License Key",
     "Invoice Number",
+    "Has Invoice",
     "Notes",
   ];
   const rows = software.map((s) => [
@@ -215,6 +218,7 @@ function exportSoftwareCSV(software: StoreSoftware[]) {
     s.licenseType ?? "",
     s.licenseKey ?? "",
     s.invoiceNumber ?? "",
+    (s as any).invoiceFile ? "Yes" : "No",
     s.notes ?? "",
   ]);
   downloadCSV(
