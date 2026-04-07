@@ -52,7 +52,6 @@ import { useGetAllSoftware } from "../hooks/useSoftwareQueries";
 import { getWarrantyStatus } from "../lib/warrantyUtils";
 
 const STAT_SKELETONS = ["s1", "s2", "s3", "s4", "s5"] as const;
-const SW_STAT_SKELETONS = ["sw1", "sw2", "sw3", "sw4"] as const;
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Laptop: <Laptop className="h-5 w-5" />,
@@ -243,8 +242,6 @@ export function DashboardPage({ onNavigate }: Props) {
     softwareLicenseAlerts: boolean;
     hardwareSpecs: boolean;
     assetAgeByCategory: boolean;
-    warrantyExpiry: boolean;
-    softwareSummary: boolean;
   };
 
   const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
@@ -254,8 +251,6 @@ export function DashboardPage({ onNavigate }: Props) {
     softwareLicenseAlerts: true,
     hardwareSpecs: true,
     assetAgeByCategory: true,
-    warrantyExpiry: true,
-    softwareSummary: true,
   };
 
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(
@@ -450,112 +445,61 @@ export function DashboardPage({ onNavigate }: Props) {
   );
 
   // Software expiry computed data
-  const {
-    softwareExpired,
-    softwareExpiringSoon: swExpiringSoon,
-    softwareAtRisk,
-    softwareAtRiskCount,
-  } = useMemo(() => {
-    if (!softwareList) {
-      return {
-        softwareExpired: [],
-        softwareExpiringSoon: [],
-        softwareExpiringWarn: [],
-        softwareAtRisk: [],
-        softwareAtRiskCount: 0,
-      };
-    }
-    const now = Date.now();
-    const expired: typeof softwareList = [];
-    const expiringSoon: typeof softwareList = [];
-    const expiringWarn: typeof softwareList = [];
-
-    for (const sw of softwareList) {
-      const expiryStr = Array.isArray(sw.licenseExpiry)
-        ? sw.licenseExpiry[0]
-        : sw.licenseExpiry;
-      if (!expiryStr) continue;
-      const expiryDate = new Date(expiryStr);
-      if (Number.isNaN(expiryDate.getTime())) continue;
-      const daysUntil = Math.floor(
-        (expiryDate.getTime() - now) / (1000 * 60 * 60 * 24),
-      );
-      if (daysUntil < 0) {
-        expired.push(sw);
-      } else if (daysUntil <= 30) {
-        expiringSoon.push(sw);
-      } else if (daysUntil <= 90) {
-        expiringWarn.push(sw);
-      }
-    }
-
-    const atRisk = [...expired, ...expiringSoon, ...expiringWarn].sort(
-      (a, b) => {
-        const getExpiry = (s: typeof a) => {
-          const str = Array.isArray(s.licenseExpiry)
-            ? s.licenseExpiry[0]
-            : s.licenseExpiry;
-          return str ? new Date(str).getTime() : Number.POSITIVE_INFINITY;
+  const { softwareExpired, softwareAtRisk, softwareAtRiskCount } =
+    useMemo(() => {
+      if (!softwareList) {
+        return {
+          softwareExpired: [],
+          softwareExpiringSoon: [],
+          softwareExpiringWarn: [],
+          softwareAtRisk: [],
+          softwareAtRiskCount: 0,
         };
-        return getExpiry(a) - getExpiry(b);
-      },
-    );
+      }
+      const now = Date.now();
+      const expired: typeof softwareList = [];
+      const expiringSoon: typeof softwareList = [];
+      const expiringWarn: typeof softwareList = [];
 
-    return {
-      softwareExpired: expired,
-      softwareExpiringSoon: expiringSoon,
-      softwareExpiringWarn: expiringWarn,
-      softwareAtRisk: atRisk,
-      softwareAtRiskCount: atRisk.length,
-    };
-  }, [softwareList]);
-
-  // Software summary counts
-  const softwareTotalCount = softwareList ? softwareList.length : 0;
-  const softwareActiveCount = softwareList
-    ? softwareList.filter((sw) => {
+      for (const sw of softwareList) {
         const expiryStr = Array.isArray(sw.licenseExpiry)
           ? sw.licenseExpiry[0]
           : sw.licenseExpiry;
-        if (!expiryStr) return true; // no expiry = active
+        if (!expiryStr) continue;
         const expiryDate = new Date(expiryStr);
-        if (Number.isNaN(expiryDate.getTime())) return true;
-        return expiryDate.getTime() > Date.now();
-      }).length
-    : 0;
-  const softwareExpiringSoonCount = swExpiringSoon.length;
-  const softwareExpiredCount = softwareExpired.length;
+        if (Number.isNaN(expiryDate.getTime())) continue;
+        const daysUntil = Math.floor(
+          (expiryDate.getTime() - now) / (1000 * 60 * 60 * 24),
+        );
+        if (daysUntil < 0) {
+          expired.push(sw);
+        } else if (daysUntil <= 30) {
+          expiringSoon.push(sw);
+        } else if (daysUntil <= 90) {
+          expiringWarn.push(sw);
+        }
+      }
 
-  // Hardware warranty expiry breakdown (all, not sliced)
-  const warrantyExpiredAssets = useMemo(() => {
-    return sourceAssets
-      .filter((a) => {
-        const ws = getWarrantyStatus(a.warrantyDate);
-        return ws?.variant === "expired";
-      })
-      .sort((a, b) => {
-        const wsA = getWarrantyStatus(a.warrantyDate);
-        const wsB = getWarrantyStatus(b.warrantyDate);
-        return (wsA?.daysLeft ?? 0) - (wsB?.daysLeft ?? 0);
-      });
-  }, [sourceAssets]);
+      const atRisk = [...expired, ...expiringSoon, ...expiringWarn].sort(
+        (a, b) => {
+          const getExpiry = (s: typeof a) => {
+            const str = Array.isArray(s.licenseExpiry)
+              ? s.licenseExpiry[0]
+              : s.licenseExpiry;
+            return str ? new Date(str).getTime() : Number.POSITIVE_INFINITY;
+          };
+          return getExpiry(a) - getExpiry(b);
+        },
+      );
 
-  const warrantyExpiringSoonAssets = useMemo(() => {
-    return sourceAssets
-      .filter((a) => {
-        const ws = getWarrantyStatus(a.warrantyDate);
-        return ws?.variant === "warning";
-      })
-      .sort((a, b) => {
-        const wsA = getWarrantyStatus(a.warrantyDate);
-        const wsB = getWarrantyStatus(b.warrantyDate);
-        return (wsA?.daysLeft ?? 0) - (wsB?.daysLeft ?? 0);
-      });
-  }, [sourceAssets]);
-
-  const [warrantyTab, setWarrantyTab] = useState<"expiringSoon" | "expired">(
-    "expiringSoon",
-  );
+      return {
+        softwareExpired: expired,
+        softwareExpiringSoon: expiringSoon,
+        softwareExpiringWarn: expiringWarn,
+        softwareAtRisk: atRisk,
+        softwareAtRiskCount: atRisk.length,
+      };
+    }, [softwareList]);
 
   const _softwareCardAccentColor =
     softwareExpired.length > 0 ? "#dc2626" : "#d97706";
@@ -690,8 +634,6 @@ export function DashboardPage({ onNavigate }: Props) {
                 {(
                   [
                     { key: "warrantyAlerts", label: "Warranty Alerts" },
-                    { key: "warrantyExpiry", label: "Warranty Expiry Tab" },
-                    { key: "softwareSummary", label: "Software Summary" },
                     { key: "categoryBreakdown", label: "Assets by Category" },
                     { key: "ageAlerts", label: "Age Alerts" },
                     {
@@ -883,62 +825,6 @@ export function DashboardPage({ onNavigate }: Props) {
           </>
         )}
       </div>
-
-      {/* Software Summary Stat Cards */}
-      {panelVisibility.softwareSummary && (
-        <>
-          <div className="flex items-center gap-2 mt-1">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Software Summary
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            {softwareLoading ? (
-              SW_STAT_SKELETONS.map((k) => (
-                <Skeleton key={k} className="h-24 rounded-xl" />
-              ))
-            ) : (
-              <>
-                <StatCard
-                  label="Total Software"
-                  value={softwareTotalCount}
-                  icon={<Package className="h-5 w-5" />}
-                  accentColor="oklch(var(--foreground))"
-                  index={0}
-                  onClick={() => onNavigate?.("software")}
-                />
-                <StatCard
-                  label="Active Licenses"
-                  value={softwareActiveCount}
-                  icon={<CheckCircle2 className="h-5 w-5" />}
-                  accentColor="#16a34a"
-                  index={1}
-                  onClick={() => onNavigate?.("software")}
-                />
-                <StatCard
-                  label="Expiring Soon"
-                  value={softwareExpiringSoonCount}
-                  icon={<Clock className="h-5 w-5" />}
-                  accentColor="#d97706"
-                  index={2}
-                  warningBg={softwareExpiringSoonCount > 0}
-                  onClick={() => onNavigate?.("software")}
-                />
-                <StatCard
-                  label="Expired"
-                  value={softwareExpiredCount}
-                  icon={<AlertTriangle className="h-5 w-5" />}
-                  accentColor="#dc2626"
-                  index={3}
-                  warningBg={softwareExpiredCount > 0}
-                  onClick={() => onNavigate?.("software")}
-                />
-              </>
-            )}
-          </div>
-        </>
-      )}
 
       {/* Quick filter buttons */}
       <div className="flex flex-wrap gap-2">
@@ -1228,173 +1114,6 @@ export function DashboardPage({ onNavigate }: Props) {
                     >
                       {ageLabel}
                     </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs h-7 px-2 flex-shrink-0"
-                      onClick={() =>
-                        onNavigate?.("inventory", `cat:${asset.category}`)
-                      }
-                      data-ocid="dashboard.secondary_button"
-                    >
-                      View
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </motion.div>
-      )}
-
-      {/* Hardware Warranty Expiry Panel */}
-      {panelVisibility.warrantyExpiry && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28, duration: 0.35 }}
-          className="rounded-xl border shadow-card bg-card overflow-hidden"
-          data-ocid="dashboard.warranty_expiry_panel"
-        >
-          <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap">
-            <ShieldAlert className="h-4 w-4 text-destructive" />
-            <h2 className="font-semibold text-base text-foreground">
-              Hardware Warranty Expiry
-            </h2>
-            {(warrantyExpiredAssets.length > 0 ||
-              warrantyExpiringSoonAssets.length > 0) && (
-              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
-                {warrantyExpiredAssets.length +
-                  warrantyExpiringSoonAssets.length}
-              </span>
-            )}
-          </div>
-          {/* Tab bar */}
-          <div className="flex border-b bg-muted/30">
-            <button
-              className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${warrantyTab === "expiringSoon" ? "border-b-2 border-primary text-primary bg-background" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setWarrantyTab("expiringSoon")}
-              type="button"
-              data-ocid="dashboard.tab_expiring_soon"
-            >
-              Expiring Soon
-              {warrantyExpiringSoonAssets.length > 0 && (
-                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
-                  {warrantyExpiringSoonAssets.length}
-                </span>
-              )}
-            </button>
-            <button
-              className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${warrantyTab === "expired" ? "border-b-2 border-destructive text-destructive bg-background" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setWarrantyTab("expired")}
-              type="button"
-              data-ocid="dashboard.tab_expired"
-            >
-              Expired
-              {warrantyExpiredAssets.length > 0 && (
-                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
-                  {warrantyExpiredAssets.length}
-                </span>
-              )}
-            </button>
-          </div>
-          {assetsLoading ? (
-            <div className="p-5 space-y-3" data-ocid="dashboard.loading_state">
-              {["wt1", "wt2", "wt3"].map((k) => (
-                <Skeleton key={k} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : warrantyTab === "expiringSoon" ? (
-            warrantyExpiringSoonAssets.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center py-12 gap-2"
-                data-ocid="dashboard.empty_state"
-              >
-                <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  No warranties expiring soon
-                </p>
-              </div>
-            ) : (
-              <ul className="divide-y">
-                {warrantyExpiringSoonAssets.map((asset, i) => {
-                  const ws = getWarrantyStatus(asset.warrantyDate);
-                  return (
-                    <li
-                      key={String(asset.id)}
-                      className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
-                      data-ocid={`dashboard.item.${i + 1}`}
-                    >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-100 text-amber-700">
-                        <Clock className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {asset.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Warranty: {asset.warrantyDate}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <StatusBadge status={asset.status} />
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          {ws?.label}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-7 px-2 flex-shrink-0"
-                        onClick={() =>
-                          onNavigate?.("inventory", `cat:${asset.category}`)
-                        }
-                        data-ocid="dashboard.secondary_button"
-                      >
-                        View
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )
-          ) : warrantyExpiredAssets.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center py-12 gap-2"
-              data-ocid="dashboard.empty_state"
-            >
-              <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No warranties expired
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {warrantyExpiredAssets.map((asset, i) => {
-                const ws = getWarrantyStatus(asset.warrantyDate);
-                return (
-                  <li
-                    key={String(asset.id)}
-                    className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
-                    data-ocid={`dashboard.item.${i + 1}`}
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-red-100 text-red-700">
-                      <AlertTriangle className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {asset.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Warranty: {asset.warrantyDate}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <StatusBadge status={asset.status} />
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                        {ws?.label}
-                      </span>
-                    </div>
                     <Button
                       variant="ghost"
                       size="sm"

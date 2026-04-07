@@ -412,6 +412,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                     <TableRow
                       style={{ backgroundColor: "oklch(var(--muted) / 0.5)" }}
                     >
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide w-12">
+                        #
+                      </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
                         Asset Tag
                       </TableHead>
@@ -462,6 +465,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
                           className="hover:bg-muted/30 transition-colors"
                           data-ocid={`software.item.${rowIdx}`}
                         >
+                          <TableCell className="text-sm text-muted-foreground font-mono">
+                            {(page - 1) * PAGE_SIZE + i + 1}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {(sw as any).assetTag || "—"}
                           </TableCell>

@@ -81,6 +81,44 @@ export function LoginPage({
       // JSON fetch failed — continue to error
     }
 
+    // 3. Check localStorage JSON registry (users added via Admin panel that were synced to registry)
+    try {
+      const stored = localStorage.getItem("brandscapes_users_json_registry");
+      if (stored) {
+        const registry = JSON.parse(stored) as Array<{
+          userId: string;
+          password: string;
+          name: string;
+          accessLevel: string;
+        }>;
+        const match = registry.find(
+          (u) => u.userId === usernameClean && u.password === password,
+        );
+        if (match) {
+          localDB.upsertUserByUsername({
+            name: match.name,
+            username: match.userId,
+            password: match.password,
+            accessLevel: match.accessLevel,
+            employeeCode: "",
+            department: "",
+            email: "",
+          });
+          const session: LocalSession = {
+            name: match.name,
+            accessLevel: match.accessLevel,
+            username: match.userId,
+            password: password,
+          };
+          localStorage.setItem("localUserSession", JSON.stringify(session));
+          onLocalLogin(session);
+          return;
+        }
+      }
+    } catch {
+      // Registry read failed — continue to error
+    }
+
     setLocalError("Invalid username or password");
     setLocalLoading(false);
   };

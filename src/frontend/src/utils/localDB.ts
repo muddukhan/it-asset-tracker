@@ -6,6 +6,7 @@ const HISTORY_KEY = "brandscapes_history";
 const HISTORY_ID_KEY = "brandscapes_next_history_id";
 const SEEDED_KEY = "brandscapes_seeded";
 const USERS_KEY = "brandscapes_local_users";
+const JSON_REGISTRY_KEY = "brandscapes_users_json_registry";
 const USERS_ID_KEY = "brandscapes_next_user_id";
 
 export type LocalAsset = {
@@ -175,6 +176,35 @@ function recordHistory(
     timestamp: Date.now(),
   });
   writeHistory(entries);
+}
+
+type JsonRegistryUser = {
+  userId: string;
+  password: string;
+  name: string;
+  accessLevel: string;
+};
+
+function syncUserToJsonRegistry(user: LocalDBUser): void {
+  try {
+    const stored = localStorage.getItem(JSON_REGISTRY_KEY);
+    let registry: JsonRegistryUser[] = stored ? JSON.parse(stored) : [];
+    const idx = registry.findIndex((u) => u.userId === user.username);
+    const entry: JsonRegistryUser = {
+      userId: user.username,
+      password: user.password,
+      name: user.name,
+      accessLevel: user.accessLevel,
+    };
+    if (idx !== -1) {
+      registry[idx] = entry;
+    } else {
+      registry.push(entry);
+    }
+    localStorage.setItem(JSON_REGISTRY_KEY, JSON.stringify(registry));
+  } catch {
+    // Silently ignore registry sync errors
+  }
 }
 
 function seed(): void {
@@ -428,6 +458,7 @@ export const localDB = {
     };
     users.push(user);
     writeUsers(users);
+    syncUserToJsonRegistry(user);
     return user;
   },
 
@@ -479,6 +510,7 @@ export const localDB = {
     };
     users[idx] = updated;
     writeUsers(users);
+    syncUserToJsonRegistry(updated);
     return updated;
   },
 

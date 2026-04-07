@@ -492,6 +492,9 @@ export function InventoryPage({
                       style={{ backgroundColor: "oklch(var(--muted) / 0.5)" }}
                     >
                       <TableHead className="text-xs font-semibold uppercase tracking-wide w-12">
+                        #
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide w-12">
                         Photo
                       </TableHead>
                       <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -557,6 +560,9 @@ export function InventoryPage({
                           data-ocid={`inventory.item.${rowIdx}`}
                           onClick={() => setDetailAsset(asset)}
                         >
+                          <TableCell className="text-sm text-muted-foreground font-mono">
+                            {(page - 1) * PAGE_SIZE + i + 1}
+                          </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {asset.photoDataUrl ? (
                               <img
