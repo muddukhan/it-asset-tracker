@@ -198,6 +198,8 @@ function AppShell() {
       case "software":
         return (
           <SoftwareInventoryPage
+            key={pageState.filter}
+            initialLicenseFilter={pageState.filter}
             onBack={previousPage === "dashboard" ? goBack : undefined}
           />
         );

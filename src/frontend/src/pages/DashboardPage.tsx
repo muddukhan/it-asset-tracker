@@ -842,7 +842,7 @@ export function DashboardPage({ onNavigate }: Props) {
               icon={<CheckCircle2 className="h-5 w-5" />}
               accentColor="oklch(var(--status-assigned-text))"
               index={1}
-              onClick={() => onNavigate?.("inventory", "assigned")}
+              onClick={() => onNavigate?.("inventory", "Assigned")}
             />
             <StatCard
               label="In Repair"
@@ -856,7 +856,7 @@ export function DashboardPage({ onNavigate }: Props) {
               icon={<Wrench className="h-5 w-5" />}
               accentColor="oklch(var(--status-inrepair-text))"
               index={2}
-              onClick={() => onNavigate?.("inventory", "inRepair")}
+              onClick={() => onNavigate?.("inventory", "In Repair")}
             />
             <StatCard
               label="Available"
@@ -870,7 +870,7 @@ export function DashboardPage({ onNavigate }: Props) {
               icon={<BarChart3 className="h-5 w-5" />}
               accentColor="oklch(var(--status-available-text))"
               index={3}
-              onClick={() => onNavigate?.("inventory", "available")}
+              onClick={() => onNavigate?.("inventory", "Available")}
             />
             <StatCard
               label="Retired"
@@ -914,7 +914,7 @@ export function DashboardPage({ onNavigate }: Props) {
                   icon={<CheckCircle2 className="h-5 w-5" />}
                   accentColor="#16a34a"
                   index={1}
-                  onClick={() => onNavigate?.("software")}
+                  onClick={() => onNavigate?.("software", "valid")}
                 />
                 <StatCard
                   label="Expiring Soon"
@@ -923,7 +923,7 @@ export function DashboardPage({ onNavigate }: Props) {
                   accentColor="#d97706"
                   index={2}
                   warningBg={softwareExpiringSoonCount > 0}
-                  onClick={() => onNavigate?.("software")}
+                  onClick={() => onNavigate?.("software", "expiring")}
                 />
                 <StatCard
                   label="Expired"
@@ -932,7 +932,7 @@ export function DashboardPage({ onNavigate }: Props) {
                   accentColor="#dc2626"
                   index={3}
                   warningBg={softwareExpiredCount > 0}
-                  onClick={() => onNavigate?.("software")}
+                  onClick={() => onNavigate?.("software", "expired")}
                 />
               </>
             )}

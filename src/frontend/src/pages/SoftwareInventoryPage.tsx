@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -69,7 +76,7 @@ const PAGE_SIZE = 15;
 const SKELETON_ROWS = ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6"] as const;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-type Props = { onBack?: () => void };
+type Props = { onBack?: () => void; initialLicenseFilter?: string };
 
 function getLicenseStatus(expiry?: string) {
   if (!expiry) return null;
@@ -141,7 +148,7 @@ const EMPTY_FORM: SoftwareForm = {
   invoiceFileName: "",
 };
 
-export function SoftwareInventoryPage({ onBack }: Props) {
+export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
   const { data: software, isLoading } = useGetAllSoftware();
   const { data: isAdmin } = useIsCallerAdmin();
   const addSoftware = useAddSoftware();
@@ -149,6 +156,9 @@ export function SoftwareInventoryPage({ onBack }: Props) {
   const deleteSoftware = useDeleteSoftware();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [licenseFilter, setLicenseFilter] = useState<string>(
+    initialLicenseFilter ?? "all",
+  );
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<LocalSoftware | null>(null);
@@ -159,14 +169,22 @@ export function SoftwareInventoryPage({ onBack }: Props) {
 
   const filtered = useMemo(() => {
     if (!software) return [];
-    if (!searchTerm) return software;
-    const term = searchTerm.toLowerCase();
-    return software.filter(
-      (s) =>
-        s.name.toLowerCase().includes(term) ||
-        s.vendor.toLowerCase().includes(term),
-    );
-  }, [software, searchTerm]);
+    let result = software;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.name.toLowerCase().includes(term) ||
+          s.vendor.toLowerCase().includes(term),
+      );
+    }
+    if (licenseFilter && licenseFilter !== "all") {
+      result = result.filter(
+        (s) => getLicenseStatus(s.licenseExpiry) === licenseFilter,
+      );
+    }
+    return result;
+  }, [software, searchTerm, licenseFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -318,12 +336,30 @@ export function SoftwareInventoryPage({ onBack }: Props) {
               variant="outline"
               onClick={() => {
                 setSearchTerm("");
+                setLicenseFilter("all");
                 setPage(1);
               }}
               data-ocid="software.secondary_button"
             >
               Clear
             </Button>
+            <Select
+              value={licenseFilter}
+              onValueChange={(v) => {
+                setLicenseFilter(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[160px]" data-ocid="software.select">
+                <SelectValue placeholder="License Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Licenses</SelectItem>
+                <SelectItem value="valid">Active</SelectItem>
+                <SelectItem value="expiring">Expiring Soon</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
