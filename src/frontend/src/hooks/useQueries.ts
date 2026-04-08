@@ -1,7 +1,17 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UserRole, UserWithRole } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
+
+// Local type definitions (backend doesn't expose these — local auth only)
+export enum UserRole {
+  admin = "admin",
+  user = "user",
+  guest = "guest",
+}
+export interface UserWithRole {
+  principal: Principal;
+  role: UserRole;
+}
 import {
   type LocalAsset,
   type LocalAssetInput,
@@ -144,9 +154,9 @@ export function useGetAllUsersWithRoles(isAdmin: boolean) {
   const { actor, isFetching } = useActor();
   return useQuery<UserWithRole[]>({
     queryKey: ["usersWithRoles"],
-    queryFn: async () => {
+    queryFn: async (): Promise<UserWithRole[]> => {
       if (!actor) return [];
-      return actor.getAllUsersWithRoles();
+      return actor.getAllUsersWithRoles() as Promise<UserWithRole[]>;
     },
     enabled: !!actor && !isFetching && isAdmin,
   });

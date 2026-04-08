@@ -12,10 +12,10 @@ import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
 
 
-import AccessControl "authorization/access-control";
-import MixinAuthorization "authorization/MixinAuthorization";
-import MixinStorage "blob-storage/Mixin";
-import Storage "blob-storage/Storage";
+import AccessControl "../src/backend/authorization/access-control";
+import MixinAuthorization "../src/backend/authorization/MixinAuthorization";
+import MixinStorage "../src/backend/blob-storage/Mixin";
+import Storage "../src/backend/blob-storage/Storage";
 
 actor {
   // Access control must be initialized first

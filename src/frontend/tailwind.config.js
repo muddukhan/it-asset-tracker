@@ -17,6 +17,8 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        orbitron: ['Orbitron', 'system-ui', 'sans-serif'],
+        mono: ['Share Tech Mono', 'JetBrains Mono', 'monospace'],
       },
       colors: {
         border: "oklch(var(--border))",
@@ -82,6 +84,8 @@ export default {
       boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
         card: "0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.04)",
+        "neon-cyan": "0 0 12px oklch(0.75 0.2 195 / 0.5), 0 0 32px oklch(0.75 0.2 195 / 0.2)",
+        "neon-magenta": "0 0 12px oklch(0.65 0.28 320 / 0.5), 0 0 32px oklch(0.65 0.28 320 / 0.2)",
       },
       keyframes: {
         "accordion-down": {
@@ -92,10 +96,31 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "cyber-scan": {
+          "0%": { top: "-2px", opacity: "0" },
+          "5%": { opacity: "1" },
+          "95%": { opacity: "0.3" },
+          "100%": { top: "100vh", opacity: "0" },
+        },
+        "cyber-pulse": {
+          "0%, 100%": { boxShadow: "0 0 8px oklch(0.65 0.28 320 / 0.4)" },
+          "50%": { boxShadow: "0 0 20px oklch(0.65 0.28 320 / 0.8), 0 0 40px oklch(0.65 0.28 320 / 0.3)" },
+        },
+        "neon-flicker": {
+          "0%, 100%": { opacity: "1" },
+          "92%": { opacity: "1" },
+          "93%": { opacity: "0.4" },
+          "94%": { opacity: "1" },
+          "95%": { opacity: "0.6" },
+          "96%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "cyber-scan": "cyber-scan 4s ease-in-out infinite",
+        "cyber-pulse": "cyber-pulse 2.5s ease-in-out infinite",
+        "neon-flicker": "neon-flicker 8s linear infinite",
       },
     },
   },

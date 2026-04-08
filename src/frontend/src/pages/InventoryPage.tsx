@@ -37,7 +37,7 @@ import {
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { LocalAsset } from "../utils/localDB";
 
@@ -62,6 +62,7 @@ type Props = {
   initialStatusFilter?: string;
   initialCategoryFilter?: string;
   initialAgeFilter?: string;
+  initialAssetId?: string;
   onBack?: () => void;
 };
 
@@ -121,6 +122,7 @@ export function InventoryPage({
   initialStatusFilter,
   initialCategoryFilter,
   initialAgeFilter,
+  initialAssetId,
   onBack,
 }: Props) {
   const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
@@ -147,6 +149,19 @@ export function InventoryPage({
   const [detailAsset, setDetailAsset] = useState<LocalAsset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LocalAsset | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  // Track whether we've already auto-opened the asset from initialAssetId
+  const [autoOpenDone, setAutoOpenDone] = useState(false);
+
+  // Auto-open detail modal when initialAssetId is provided and assets are loaded
+  useEffect(() => {
+    if (autoOpenDone || !initialAssetId || !assets || assets.length === 0)
+      return;
+    const target = assets.find((a) => String(a.id) === String(initialAssetId));
+    if (target) {
+      setDetailAsset(target);
+      setAutoOpenDone(true);
+    }
+  }, [initialAssetId, assets, autoOpenDone]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: addModalOpen triggers refresh after modal close
   const windowsVersions = useMemo(() => getWindowsVersions(), [addModalOpen]);

@@ -170,14 +170,31 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
+  'addAssetWithCreds' : ActorMethod<[string, string, AssetInput], bigint>,
   'addLocalUser' : ActorMethod<[LocalUserInput], bigint>,
+  'addLocalUserWithCreds' : ActorMethod<
+    [string, string, LocalUserInput],
+    bigint
+  >,
   'addSoftware' : ActorMethod<[StoreSoftwareInput], bigint>,
+  'addSoftwareWithCreds' : ActorMethod<
+    [string, string, StoreSoftwareInput],
+    bigint
+  >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'assignRole' : ActorMethod<[Principal, UserRole], undefined>,
   'bootstrapAdmin' : ActorMethod<[], boolean>,
+  'createFirstLocalUser' : ActorMethod<
+    [LocalUserInput],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
+  'deleteAssetWithCreds' : ActorMethod<[string, string, bigint], undefined>,
   'deleteLocalUser' : ActorMethod<[bigint], undefined>,
+  'deleteLocalUserWithCreds' : ActorMethod<[string, string, bigint], undefined>,
   'deleteSoftware' : ActorMethod<[bigint], undefined>,
+  'deleteSoftwareWithCreds' : ActorMethod<[string, string, bigint], undefined>,
   'getAllAssets' : ActorMethod<[], Array<Asset>>,
   'getAllLocalUsers' : ActorMethod<[], Array<LocalUser>>,
   'getAllSoftware' : ActorMethod<[], Array<StoreSoftware>>,
@@ -193,6 +210,8 @@ export interface _SERVICE {
   'getStats' : ActorMethod<[], Stats>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWarrantyStats' : ActorMethod<[], WarrantyStats>,
+  'hasLocalUsers' : ActorMethod<[], boolean>,
+  'isAdminWithCreds' : ActorMethod<[string, string], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'loginLocalUser' : ActorMethod<
     [string, string],
@@ -200,22 +219,25 @@ export interface _SERVICE {
   >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,
+  'selfRegisterLocalUser' : ActorMethod<
+    [string, string, string, string],
+    boolean
+  >,
   'updateAsset' : ActorMethod<[bigint, AssetInput], undefined>,
+  'updateAssetWithCreds' : ActorMethod<
+    [string, string, bigint, AssetInput],
+    undefined
+  >,
   'updateLocalUser' : ActorMethod<[bigint, LocalUserInput], undefined>,
+  'updateLocalUserWithCreds' : ActorMethod<
+    [string, string, bigint, LocalUserInput],
+    undefined
+  >,
   'updateSoftware' : ActorMethod<[bigint, StoreSoftwareInput], undefined>,
-  'addAssetWithCreds' : ActorMethod<[string, string, AssetInput], bigint>,
-  'updateAssetWithCreds' : ActorMethod<[string, string, bigint, AssetInput], undefined>,
-  'deleteAssetWithCreds' : ActorMethod<[string, string, bigint], undefined>,
-  'addSoftwareWithCreds' : ActorMethod<[string, string, StoreSoftwareInput], bigint>,
-  'updateSoftwareWithCreds' : ActorMethod<[string, string, bigint, StoreSoftwareInput], undefined>,
-  'deleteSoftwareWithCreds' : ActorMethod<[string, string, bigint], undefined>,
-  'addLocalUserWithCreds' : ActorMethod<[string, string, LocalUserInput], bigint>,
-  'updateLocalUserWithCreds' : ActorMethod<[string, string, bigint, LocalUserInput], undefined>,
-  'deleteLocalUserWithCreds' : ActorMethod<[string, string, bigint], undefined>,
-  'isAdminWithCreds' : ActorMethod<[string, string], boolean>,
-  'createFirstLocalUser' : ActorMethod<[LocalUserInput], { 'ok' : bigint } | { 'err' : string }>,
-  'hasLocalUsers' : ActorMethod<[], boolean>,
-  'selfRegisterLocalUser' : ActorMethod<[string, string, string, string], { 'ok' : bigint } | { 'alreadyExists' : null }>,
+  'updateSoftwareWithCreds' : ActorMethod<
+    [string, string, bigint, StoreSoftwareInput],
+    undefined
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

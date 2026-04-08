@@ -1,0 +1,240 @@
+type _CaffeineStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _CaffeineStorageRefillInformation = record {
+                                           proposed_top_up_amount: opt nat;};
+type _CaffeineStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type WarrantyStats = 
+ record {
+   active: nat;
+   expired: nat;
+   expiringSoon: nat;
+   total: nat;
+ };
+type UserWithRole = 
+ record {
+   "principal": Principal;
+   role: UserRole;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = record {name: text;};
+type Time = int;
+type StoreSoftwareInput = 
+ record {
+   assetTag: opt text;
+   assignedTo: opt text;
+   id: opt nat;
+   invoiceNumber: opt text;
+   licenseExpiry: opt text;
+   licenseKey: opt text;
+   licenseType: opt text;
+   name: text;
+   notes: opt text;
+   purchaseDate: opt text;
+   vendor: text;
+ };
+type StoreSoftware = 
+ record {
+   assetTag: opt text;
+   assignedTo: opt text;
+   createdAt: Time;
+   id: nat;
+   invoiceNumber: opt text;
+   licenseExpiry: opt text;
+   licenseKey: opt text;
+   licenseType: opt text;
+   name: text;
+   notes: opt text;
+   purchaseDate: opt text;
+   vendor: text;
+ };
+type Stats = 
+ record {
+   assigned: nat;
+   available: nat;
+   inRepair: nat;
+   total: nat;
+ };
+type Principal = principal;
+type LocalUserInput = 
+ record {
+   accessLevel: text;
+   department: text;
+   email: text;
+   employeeCode: text;
+   name: text;
+   notes: opt text;
+   password: text;
+   username: text;
+ };
+type LocalUser = 
+ record {
+   accessLevel: text;
+   department: text;
+   email: text;
+   employeeCode: text;
+   id: nat;
+   name: text;
+   notes: opt text;
+   username: text;
+ };
+type ExternalBlob = blob;
+type AssignmentHistoryEntry = 
+ record {
+   assetId: nat;
+   assetName: text;
+   changedBy: Principal;
+   fromAssignee: opt text;
+   fromStatus: AssetStatus;
+   id: nat;
+   timestamp: Time;
+   toAssignee: opt text;
+   toStatus: AssetStatus;
+ };
+type AssetStatus = 
+ variant {
+   assigned;
+   available;
+   inRepair;
+   inStorage;
+   retired;
+ };
+type AssetInput = 
+ record {
+   assetTag: opt text;
+   assignedUser: opt text;
+   category: AssetCategory;
+   employeeCode: opt text;
+   id: opt nat;
+   invoiceNumber: opt text;
+   location: text;
+   name: text;
+   notes: opt text;
+   photoId: opt ExternalBlob;
+   processorType: opt text;
+   purchaseDate: opt text;
+   ram: opt text;
+   serialNumber: text;
+   status: AssetStatus;
+   storage: opt text;
+   vendorName: opt text;
+   warrantyDate: opt text;
+ };
+type AssetCategory = 
+ variant {
+   desktop;
+   laptop;
+   monitor;
+   other;
+   peripheral;
+   printer;
+   server;
+ };
+type Asset = 
+ record {
+   assetTag: opt text;
+   assignedUser: opt text;
+   category: AssetCategory;
+   createdAt: Time;
+   employeeCode: opt text;
+   id: nat;
+   invoiceNumber: opt text;
+   location: text;
+   name: text;
+   notes: opt text;
+   photoId: opt ExternalBlob;
+   processorType: opt text;
+   purchaseDate: opt text;
+   ram: opt text;
+   serialNumber: text;
+   status: AssetStatus;
+   storage: opt text;
+   vendorName: opt text;
+   warrantyDate: opt text;
+ };
+service : {
+  _caffeineStorageBlobIsLive: (hash: blob) -> (bool) query;
+  _caffeineStorageBlobsToDelete: () -> (vec blob) query;
+  _caffeineStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _caffeineStorageCreateCertificate: (blobHash: text) ->
+   (_CaffeineStorageCreateCertificateResult);
+  _caffeineStorageRefillCashier: (refillInformation:
+   opt _CaffeineStorageRefillInformation) -> (_CaffeineStorageRefillResult);
+  _caffeineStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControlWithSecret: (userSecret: text) -> ();
+  addAsset: (input: AssetInput) -> (nat);
+  addAssetWithCreds: (adminUsername: text, adminPassword: text, input:
+   AssetInput) -> (nat);
+  addLocalUser: (input: LocalUserInput) -> (nat);
+  addLocalUserWithCreds: (adminUsername: text, adminPassword: text, input:
+   LocalUserInput) -> (nat);
+  addSoftware: (input: StoreSoftwareInput) -> (nat);
+  addSoftwareWithCreds: (adminUsername: text, adminPassword: text, input:
+   StoreSoftwareInput) -> (nat);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  assignRole: (user: Principal, role: UserRole) -> ();
+  bootstrapAdmin: () -> (bool);
+  createFirstLocalUser: (input: LocalUserInput) ->
+   (variant {
+      err: text;
+      ok: nat;
+    });
+  deleteAsset: (id: nat) -> ();
+  deleteAssetWithCreds: (adminUsername: text, adminPassword: text, id:
+   nat) -> ();
+  deleteLocalUser: (id: nat) -> ();
+  deleteLocalUserWithCreds: (adminUsername: text, adminPassword: text, id:
+   nat) -> ();
+  deleteSoftware: (id: nat) -> ();
+  deleteSoftwareWithCreds: (adminUsername: text, adminPassword: text, id:
+   nat) -> ();
+  getAllAssets: () -> (vec Asset) query;
+  getAllLocalUsers: () -> (vec LocalUser) query;
+  getAllSoftware: () -> (vec StoreSoftware) query;
+  getAllUsersWithRoles: () -> (vec UserWithRole) query;
+  getAsset: (id: nat) -> (Asset) query;
+  getAssetsByCategory: (category: AssetCategory) -> (vec Asset) query;
+  getAssetsByLocation: (location: text) -> (vec Asset) query;
+  getAssetsByStatus: (status: AssetStatus) -> (vec Asset) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getHistory: () -> (vec AssignmentHistoryEntry) query;
+  getHistoryForAsset: (assetId: nat) -> (vec AssignmentHistoryEntry) query;
+  getStats: () -> (Stats) query;
+  getUserProfile: (user: Principal) -> (opt UserProfile) query;
+  getWarrantyStats: () -> (WarrantyStats) query;
+  hasLocalUsers: () -> (bool) query;
+  isAdminWithCreds: (adminUsername: text, adminPassword: text) ->
+   (bool) query;
+  isCallerAdmin: () -> (bool) query;
+  loginLocalUser: (username: text, password: text) ->
+   (opt record {
+          accessLevel: text;
+          id: nat;
+          name: text;
+        }) query;
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  searchAssets: (term: text) -> (vec Asset) query;
+  selfRegisterLocalUser: (username: text, password: text, name: text,
+   accessLevel: text) -> (bool);
+  updateAsset: (id: nat, input: AssetInput) -> ();
+  updateAssetWithCreds: (adminUsername: text, adminPassword: text, id: 
+   nat, input: AssetInput) -> ();
+  updateLocalUser: (id: nat, input: LocalUserInput) -> ();
+  updateLocalUserWithCreds: (adminUsername: text, adminPassword: text, id:
+   nat, input: LocalUserInput) -> ();
+  updateSoftware: (id: nat, input: StoreSoftwareInput) -> ();
+  updateSoftwareWithCreds: (adminUsername: text, adminPassword: text, id:
+   nat, input: StoreSoftwareInput) -> ();
+}

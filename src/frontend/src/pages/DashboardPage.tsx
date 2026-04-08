@@ -157,13 +157,24 @@ function StatCard({
   );
 }
 
-const THEMES: { id: DashboardTheme; label: string; color: string }[] = [
+const THEMES: {
+  id: DashboardTheme;
+  label: string;
+  color: string;
+  glow?: string;
+}[] = [
   { id: "blue-steel", label: "Blue Steel", color: "#3a6ea5" },
   { id: "ocean-dark", label: "Ocean Dark", color: "#1a2a4a" },
   { id: "forest-green", label: "Forest Green", color: "#2d6a4f" },
   { id: "sunset-orange", label: "Sunset Orange", color: "#c05621" },
   { id: "purple-haze", label: "Purple Haze", color: "#6b3fa0" },
   { id: "royal-crimson", label: "Royal Crimson", color: "#c0253a" },
+  {
+    id: "cyber-tech",
+    label: "⚡ Cyber Tech",
+    color: "#00e5ff",
+    glow: "#00e5ff",
+  },
 ];
 
 const VIEW_MODES: { id: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -565,7 +576,11 @@ export function DashboardPage({ onNavigate }: Props) {
       {/* Header row with title + theme/view toolbar */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <h1
+            className={`text-3xl font-bold text-foreground${currentTheme === "cyber-tech" ? " font-orbitron tracking-widest" : ""}`}
+          >
+            Dashboard
+          </h1>
           <p className="text-sm mt-0.5 text-muted-foreground">{today}</p>
         </div>
 
@@ -615,9 +630,16 @@ export function DashboardPage({ onNavigate }: Props) {
                   >
                     <span
                       className="w-4 h-4 rounded-full flex-shrink-0 border border-border/60"
-                      style={{ backgroundColor: theme.color }}
+                      style={{
+                        backgroundColor: theme.color,
+                        boxShadow: theme.glow
+                          ? `0 0 8px ${theme.glow}, 0 0 16px ${theme.glow}55`
+                          : undefined,
+                      }}
                     />
-                    <span className="flex-1 text-sm">{theme.label}</span>
+                    <span className="flex-1 text-sm font-medium">
+                      {theme.label}
+                    </span>
                     {currentTheme === theme.id && (
                       <Check className="h-3.5 w-3.5 text-accent" />
                     )}
@@ -1063,7 +1085,7 @@ export function DashboardPage({ onNavigate }: Props) {
                         size="sm"
                         className="text-xs h-7 px-2 flex-shrink-0"
                         onClick={() =>
-                          onNavigate?.("inventory", `cat:${asset.category}`)
+                          onNavigate?.("inventory", `assetId:${asset.id}`)
                         }
                         data-ocid="dashboard.secondary_button"
                       >
@@ -1347,7 +1369,7 @@ export function DashboardPage({ onNavigate }: Props) {
                         size="sm"
                         className="text-xs h-7 px-2 flex-shrink-0"
                         onClick={() =>
-                          onNavigate?.("inventory", `cat:${asset.category}`)
+                          onNavigate?.("inventory", `assetId:${asset.id}`)
                         }
                         data-ocid="dashboard.secondary_button"
                       >
@@ -1400,7 +1422,7 @@ export function DashboardPage({ onNavigate }: Props) {
                       size="sm"
                       className="text-xs h-7 px-2 flex-shrink-0"
                       onClick={() =>
-                        onNavigate?.("inventory", `cat:${asset.category}`)
+                        onNavigate?.("inventory", `assetId:${asset.id}`)
                       }
                       data-ocid="dashboard.secondary_button"
                     >

@@ -1,0 +1,165 @@
+// Version: 1.0.0
+type AssetCategory__817141149 =
+  {#desktop; #laptop; #monitor; #other; #peripheral; #printer; #server};
+type AssetStatus__189821721 =
+  {#assigned; #available; #inRepair; #inStorage; #retired};
+type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type ExternalBlob__571321724 = Blob;
+type Int__270357528 = Int__616954475;
+type Int__616954475 = Int;
+type Internal__667636161<T> =
+  {children : [var ?Node__92254746<T>]; data : Data__159895909<T>};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__520550824<T> = {data : Data__159895909<T>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type Node__92254746<T> =
+  {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type Principal__224692764 = Principal;
+type Principal__390546707 = Principal__224692764;
+type StoreAsset__440815324 =
+  {
+    assignedUser : ?Text;
+    category : AssetCategory__817141149;
+    createdAt : Time__900049286;
+    id : Nat;
+    location : Text;
+    name : Text;
+    notes : ?Text;
+    photoId : ?ExternalBlob__571321724;
+    processorType : ?Text;
+    purchaseDate : ?Text;
+    ram : ?Text;
+    serialNumber : Text;
+    status : AssetStatus__189821721;
+    storage : ?Text;
+    warrantyDate : ?Text
+  };
+type StoreAssignmentHistoryEntry__192109380 =
+  {
+    assetId : Nat;
+    assetName : Text;
+    changedBy : Principal__390546707;
+    fromAssignee : ?Text;
+    fromStatus : AssetStatus__189821721;
+    id : Nat;
+    timestamp : Time__900049286;
+    toAssignee : ?Text;
+    toStatus : AssetStatus__189821721
+  };
+type StoreLocalUserCredentials__959845887 =
+  {accessLevel : Text; password : Text; username : Text};
+type StoreLocalUser__732209660 =
+  {
+    department : Text;
+    email : Text;
+    employeeCode : Text;
+    id : Nat;
+    name : Text;
+    notes : ?Text
+  };
+type StoreSoftwareRecord__931555354 =
+  {
+    createdAt : Time__900049286;
+    id : Nat;
+    licenseExpiry : ?Text;
+    licenseKey : ?Text;
+    licenseType : ?Text;
+    name : Text;
+    notes : ?Text;
+    purchaseDate : ?Text;
+    vendor : Text
+  };
+type StoreUserProfile__999002390 = {name : Text};
+type Time__796480547 = Int__270357528;
+type Time__900049286 = Time__796480547;
+type UserRole__916874478 = {#admin; #guest; #user};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__916874478>
+    };
+  stable assetEmployeeCodes :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable assetInvoiceNumbers :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable assetTags :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable assetVendorNames :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable assets :
+    {
+      var root : Node__46230540<Nat, StoreAsset__440815324>;
+      var size : Nat__490723111
+    };
+  stable history :
+    {
+      var root : Node__46230540<Nat, StoreAssignmentHistoryEntry__192109380>;
+      var size : Nat__490723111
+    };
+  stable initialized :
+    {var root : Node__92254746<Nat>; var size : Nat__490723111};
+  stable localUserCredentials :
+    {
+      var root : Node__46230540<Nat, StoreLocalUserCredentials__959845887>;
+      var size : Nat__490723111
+    };
+  stable localUsers :
+    {
+      var root : Node__46230540<Nat, StoreLocalUser__732209660>;
+      var size : Nat__490723111
+    };
+  stable var nextAssetId : Nat;
+  stable var nextHistoryId : Nat;
+  stable var nextLocalUserId : Nat;
+  stable var nextSoftwareId : Nat;
+  stable softwareAssetTags :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable softwareAssignedTo :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable softwareInventory :
+    {
+      var root : Node__46230540<Nat, StoreSoftwareRecord__931555354>;
+      var size : Nat__490723111
+    };
+  stable softwareInvoiceNumbers :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable var stableAdminAssigned : Bool;
+  stable var stableAssetEmployeeCodes : [(Nat, Text)];
+  stable var stableAssetInvoiceNumbers : [(Nat, Text)];
+  stable var stableAssetTags : [(Nat, Text)];
+  stable var stableAssetVendorNames : [(Nat, Text)];
+  stable var stableAssets : [(Nat, StoreAsset__440815324)];
+  stable var stableDataSaved : Bool;
+  stable var stableHistory : [(Nat, StoreAssignmentHistoryEntry__192109380)];
+  stable var stableLocalUserCredentials :
+    [(Nat, StoreLocalUserCredentials__959845887)];
+  stable var stableLocalUsers : [(Nat, StoreLocalUser__732209660)];
+  stable var stableNextAssetId : Nat;
+  stable var stableNextHistoryId : Nat;
+  stable var stableNextLocalUserId : Nat;
+  stable var stableNextSoftwareId : Nat;
+  stable var stableSoftwareAssetTags : [(Nat, Text)];
+  stable var stableSoftwareAssignedTo : [(Nat, Text)];
+  stable var stableSoftwareInventory :
+    [(Nat, StoreSoftwareRecord__931555354)];
+  stable var stableSoftwareInvoiceNumbers : [(Nat, Text)];
+  stable var stableUserRoles : [(Principal__390546707, UserRole__916874478)];
+  stable userProfiles :
+    {
+      var root :
+        Node__46230540<Principal__390546707, StoreUserProfile__999002390>;
+      var size : Nat__490723111
+    }
+};

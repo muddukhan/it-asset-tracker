@@ -3,27 +3,17 @@
  * Provides the same interface shape expected by App.tsx and AdminPage.tsx
  * so they compile without requiring the @caffeineai/core-infrastructure package.
  */
-import {
-  type ReactNode,
-  createContext,
-  createElement,
-  useContext,
-} from "react";
-
-// Minimal identity interface matching the methods used in App.tsx and AdminPage.tsx
-interface IdentityLike {
-  getPrincipal(): { toString(): string };
-}
+import { type ReactNode, createContext, useContext } from "react";
 
 interface InternetIdentityContextValue {
-  identity: IdentityLike | null;
+  identity: null;
   clear: () => void;
   isInitializing: boolean;
   login: () => void;
   loginStatus: "idle";
 }
 
-const II_DEFAULT: InternetIdentityContextValue = {
+const II_CONTEXT_DEFAULT: InternetIdentityContextValue = {
   identity: null,
   clear: () => {},
   isInitializing: false,
@@ -32,7 +22,7 @@ const II_DEFAULT: InternetIdentityContextValue = {
 };
 
 const InternetIdentityContext =
-  createContext<InternetIdentityContextValue>(II_DEFAULT);
+  createContext<InternetIdentityContextValue>(II_CONTEXT_DEFAULT);
 
 export function useInternetIdentity(): InternetIdentityContextValue {
   return useContext(InternetIdentityContext);
@@ -44,9 +34,9 @@ export function InternetIdentityProvider({
 }: {
   children: ReactNode;
 }) {
-  return createElement(
-    InternetIdentityContext.Provider,
-    { value: II_DEFAULT },
-    children,
+  return (
+    <InternetIdentityContext.Provider value={II_CONTEXT_DEFAULT}>
+      {children}
+    </InternetIdentityContext.Provider>
   );
 }

@@ -35,10 +35,10 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { UserRole } from "../backend";
-import type { UserWithRole } from "../backend";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  UserRole,
+  type UserWithRole,
   useAddLocalUser,
   useAssignUserRole,
   useBootstrapAdmin,

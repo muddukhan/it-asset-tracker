@@ -158,19 +158,26 @@ function AppShell() {
       case "dashboard":
         return <DashboardPage onNavigate={navigate} />;
       case "inventory": {
-        const isAgeFilter = pageState.filter?.startsWith("age:");
-        const isCatFilter = pageState.filter?.startsWith("cat:");
+        const filter = pageState.filter ?? "";
+        const isAgeFilter = filter.startsWith("age:");
+        const isCatFilter = filter.startsWith("cat:");
+        const isAssetIdFilter = filter.startsWith("assetId:");
         return (
           <InventoryPage
-            key={pageState.filter}
+            key={filter}
             initialStatusFilter={
-              isAgeFilter || isCatFilter ? undefined : pageState.filter
+              isAgeFilter || isCatFilter || isAssetIdFilter
+                ? undefined
+                : filter || undefined
             }
             initialCategoryFilter={
-              isCatFilter ? pageState.filter?.replace("cat:", "") : undefined
+              isCatFilter ? filter.replace("cat:", "") : undefined
             }
             initialAgeFilter={
-              isAgeFilter ? pageState.filter?.replace("age:", "") : undefined
+              isAgeFilter ? filter.replace("age:", "") : undefined
+            }
+            initialAssetId={
+              isAssetIdFilter ? filter.replace("assetId:", "") : undefined
             }
             onBack={previousPage === "dashboard" ? goBack : undefined}
           />
@@ -218,7 +225,17 @@ function AppShell() {
         {/* Top Navbar */}
         <header
           className="h-14 flex items-center px-4 gap-4 fixed top-0 left-0 right-0 z-40 shadow-sm"
-          style={{ backgroundColor: "oklch(var(--navbar))" }}
+          style={{
+            backgroundColor: "oklch(var(--navbar))",
+            borderBottom:
+              currentTheme === "cyber-tech"
+                ? "1px solid oklch(0.75 0.2 195 / 0.5)"
+                : undefined,
+            boxShadow:
+              currentTheme === "cyber-tech"
+                ? "0 2px 20px oklch(0.75 0.2 195 / 0.15), 0 0 60px oklch(0.75 0.2 195 / 0.05)"
+                : undefined,
+          }}
         >
           {/* Mobile menu toggle */}
           <button

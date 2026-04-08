@@ -1,4 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -184,4 +186,233 @@
   --popover-foreground: 0.14 0.02 235;
   --secondary: 0.93 0.008 240;
   --secondary-foreground: 0.14 0.02 235;
+}
+
+/* ======================================================
+   CYBER TECH: Ultra high-tech neon cyberpunk aesthetic
+   Deep void black + electric cyan + hot magenta accents
+   ====================================================== */
+[data-theme="cyber-tech"] {
+  /* Deep void background */
+  --background: 0.08 0.015 240;
+  /* Bright cyan-white foreground for readability */
+  --foreground: 0.92 0.04 195;
+  /* Elevated card surfaces — slightly lighter than bg */
+  --card: 0.12 0.02 240;
+  --card-foreground: 0.92 0.04 195;
+  /* Popover */
+  --popover: 0.1 0.018 240;
+  --popover-foreground: 0.92 0.04 195;
+  /* Primary: electric cyan */
+  --primary: 0.75 0.2 195;
+  --primary-foreground: 0.05 0.01 240;
+  /* Secondary: dark elevated panel */
+  --secondary: 0.16 0.025 240;
+  --secondary-foreground: 0.8 0.06 195;
+  /* Muted surfaces */
+  --muted: 0.14 0.02 240;
+  --muted-foreground: 0.55 0.04 210;
+  /* Accent: hot magenta/purple for contrast */
+  --accent: 0.65 0.28 320;
+  --accent-foreground: 0.05 0.01 240;
+  /* Destructive */
+  --destructive: 0.6 0.25 25;
+  --destructive-foreground: 0.05 0.01 240;
+  /* Borders: subtle neon cyan lines */
+  --border: 0.25 0.06 220;
+  --input: 0.18 0.04 220;
+  --ring: 0.75 0.2 195;
+  /* Charts */
+  --chart-1: 0.75 0.2 195;
+  --chart-2: 0.65 0.28 320;
+  --chart-3: 0.7 0.22 150;
+  --chart-4: 0.7 0.2 55;
+  --chart-5: 0.6 0.25 25;
+  /* Navbar: near-black with cyan tint */
+  --navbar: 0.06 0.02 230;
+  --navbar-foreground: 0.88 0.08 195;
+  /* Sidebar */
+  --sidebar: 0.06 0.02 230;
+  --sidebar-foreground: 0.78 0.06 200;
+  --sidebar-primary: 0.75 0.2 195;
+  --sidebar-primary-foreground: 0.05 0.01 240;
+  --sidebar-accent: 0.14 0.03 230;
+  --sidebar-accent-foreground: 0.88 0.08 195;
+  --sidebar-border: 0.2 0.05 225;
+  --sidebar-ring: 0.75 0.2 195;
+  /* Status chips — adjusted for dark bg */
+  --status-assigned-bg: 0.18 0.06 150;
+  --status-assigned-text: 0.7 0.22 150;
+  --status-instorage-bg: 0.18 0.06 55;
+  --status-instorage-text: 0.7 0.2 55;
+  --status-inrepair-bg: 0.18 0.06 25;
+  --status-inrepair-text: 0.7 0.22 25;
+  --status-available-bg: 0.16 0.06 220;
+  --status-available-text: 0.75 0.2 195;
+  --status-retired-bg: 0.14 0.02 240;
+  --status-retired-text: 0.55 0.04 210;
+}
+
+/* ── Cyber Tech global visual treatments ── */
+
+/* Animated scanning grid background on the page root */
+[data-theme="cyber-tech"] body,
+[data-theme="cyber-tech"] #app-root {
+  background-color: oklch(0.08 0.015 240);
+  background-image: linear-gradient(
+      oklch(0.75 0.2 195 / 0.04) 1px,
+      transparent 1px
+    ), linear-gradient(90deg, oklch(0.75 0.2 195 / 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Subtle top-of-page scan line sweep */
+[data-theme="cyber-tech"] #app-root::before {
+  content: "";
+  position: fixed;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.75 0.2 195) 50%,
+    transparent 100%
+  );
+  animation: cyber-scan 4s ease-in-out infinite;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+@keyframes cyber-scan {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 0.3;
+  }
+  100% {
+    top: 100vh;
+    opacity: 0;
+  }
+}
+
+/* Card glow borders */
+[data-theme="cyber-tech"] .rounded-xl,
+[data-theme="cyber-tech"] .rounded-lg {
+  border-color: oklch(0.75 0.2 195 / 0.25);
+  box-shadow: 0 0 0 1px oklch(0.75 0.2 195 / 0.08), 0 4px 24px
+    oklch(0.75 0.2 195 / 0.06);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+[data-theme="cyber-tech"] .rounded-xl:hover,
+[data-theme="cyber-tech"] .rounded-lg:hover {
+  border-color: oklch(0.75 0.2 195 / 0.5);
+  box-shadow: 0 0 0 1px oklch(0.75 0.2 195 / 0.18), 0 6px 32px
+    oklch(0.75 0.2 195 / 0.14);
+}
+
+/* Primary buttons — cyan glow */
+[data-theme="cyber-tech"] button[class*="bg-primary"],
+[data-theme="cyber-tech"] .bg-primary {
+  box-shadow: 0 0 12px oklch(0.75 0.2 195 / 0.5), 0 0 32px
+    oklch(0.75 0.2 195 / 0.2);
+  text-shadow: 0 0 8px oklch(0.05 0.01 240 / 0.8);
+}
+
+/* Navbar neon bottom border */
+[data-theme="cyber-tech"] nav,
+[data-theme="cyber-tech"] header {
+  border-bottom: 1px solid oklch(0.75 0.2 195 / 0.35);
+  box-shadow: 0 2px 20px oklch(0.75 0.2 195 / 0.12);
+}
+
+/* Table rows — subtle hover glow */
+[data-theme="cyber-tech"] tr:hover td {
+  background-color: oklch(0.75 0.2 195 / 0.04) !important;
+}
+
+/* Input focus glow */
+[data-theme="cyber-tech"] input:focus,
+[data-theme="cyber-tech"] select:focus,
+[data-theme="cyber-tech"] textarea:focus {
+  box-shadow: 0 0 0 2px oklch(0.75 0.2 195 / 0.4), 0 0 16px
+    oklch(0.75 0.2 195 / 0.15);
+  border-color: oklch(0.75 0.2 195 / 0.7);
+}
+
+/* Stat card accent corners — top-left corner bracket effect */
+[data-theme="cyber-tech"] .cyber-card {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="cyber-tech"] .cyber-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border-top: 2px solid oklch(0.75 0.2 195 / 0.8);
+  border-left: 2px solid oklch(0.75 0.2 195 / 0.8);
+  pointer-events: none;
+}
+
+[data-theme="cyber-tech"] .cyber-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-bottom: 2px solid oklch(0.65 0.28 320 / 0.7);
+  border-right: 2px solid oklch(0.65 0.28 320 / 0.7);
+  pointer-events: none;
+}
+
+/* Badge / pill neon glow */
+[data-theme="cyber-tech"] .inline-flex.items-center.rounded-full {
+  box-shadow: 0 0 6px currentColor / 0.3;
+}
+
+/* Scrollbar styling for cyber theme */
+[data-theme="cyber-tech"] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme="cyber-tech"] ::-webkit-scrollbar-track {
+  background: oklch(0.1 0.018 240);
+}
+
+[data-theme="cyber-tech"] ::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0.1 200);
+  border-radius: 3px;
+}
+
+[data-theme="cyber-tech"] ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.65 0.18 195);
+}
+
+/* Pulse animation for critical alerts on cyber theme */
+@keyframes cyber-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px oklch(0.65 0.28 320 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px oklch(0.65 0.28 320 / 0.8), 0 0 40px
+      oklch(0.65 0.28 320 / 0.3);
+  }
+}
+
+[data-theme="cyber-tech"] .cyber-alert {
+  animation: cyber-pulse 2.5s ease-in-out infinite;
 }

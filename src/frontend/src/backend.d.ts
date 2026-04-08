@@ -157,14 +157,27 @@ export enum UserRole {
 }
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
+    addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
+    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
     addSoftware(input: StoreSoftwareInput): Promise<bigint>;
+    addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     assignRole(user: Principal, role: UserRole): Promise<void>;
     bootstrapAdmin(): Promise<boolean>;
+    createFirstLocalUser(input: LocalUserInput): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     deleteAsset(id: bigint): Promise<void>;
+    deleteAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     deleteLocalUser(id: bigint): Promise<void>;
+    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     deleteSoftware(id: bigint): Promise<void>;
+    deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
     getAllSoftware(): Promise<Array<StoreSoftware>>;
@@ -180,6 +193,8 @@ export interface backendInterface {
     getStats(): Promise<Stats>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
+    hasLocalUsers(): Promise<boolean>;
+    isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     loginLocalUser(username: string, password: string): Promise<{
         id: bigint;
@@ -188,20 +203,11 @@ export interface backendInterface {
     } | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
-    updateAsset(id: bigint, input: AssetInput): Promise<void>;
-    updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
-    updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
-    addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
-    updateAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: AssetInput): Promise<void>;
-    deleteAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
-    addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint>;
-    updateSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: StoreSoftwareInput): Promise<void>;
-    deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
-    addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
-    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
-    deleteLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
-    isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean>;
     selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean>;
-    createFirstLocalUser(input: LocalUserInput): Promise<{ ok: bigint } | { err: string }>;
-    hasLocalUsers(): Promise<boolean>;
+    updateAsset(id: bigint, input: AssetInput): Promise<void>;
+    updateAssetWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: AssetInput): Promise<void>;
+    updateLocalUser(id: bigint, input: LocalUserInput): Promise<void>;
+    updateLocalUserWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: LocalUserInput): Promise<void>;
+    updateSoftware(id: bigint, input: StoreSoftwareInput): Promise<void>;
+    updateSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint, input: StoreSoftwareInput): Promise<void>;
 }
