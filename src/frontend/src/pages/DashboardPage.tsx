@@ -237,6 +237,7 @@ export function DashboardPage({ onNavigate }: Props) {
   const [processorFilter, setProcessorFilter] = useState<string>("all");
   const [ramFilter, setRamFilter] = useState<string>("all");
   const [ageFilter, setAgeFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const ageOptions = [
     { key: "lt1", label: "Under 1 Year" },
@@ -295,7 +296,7 @@ export function DashboardPage({ onNavigate }: Props) {
     day: "numeric",
   });
 
-  // Dynamically build processor and RAM options from assets
+  // Dynamically build processor, RAM, and category options from assets
   const processorOptions = useMemo(() => {
     if (!assets) return [];
     const seen = new Set<string>();
@@ -318,9 +319,22 @@ export function DashboardPage({ onNavigate }: Props) {
     return Array.from(seen).sort();
   }, [assets]);
 
+  const categoryOptions = useMemo(() => {
+    if (!assets) return [];
+    const seen = new Set<string>();
+    for (const a of assets) {
+      if (a.category && typeof a.category === "string" && a.category.trim())
+        seen.add(a.category.trim());
+    }
+    return Array.from(seen).sort();
+  }, [assets]);
+
   // Filtered assets based on spec filters
   const isSpecFiltered =
-    processorFilter !== "all" || ramFilter !== "all" || ageFilter !== "all";
+    processorFilter !== "all" ||
+    ramFilter !== "all" ||
+    ageFilter !== "all" ||
+    categoryFilter !== "all";
 
   const filteredAssets = useMemo(() => {
     if (!assets || !isSpecFiltered) return assets ?? [];
@@ -331,6 +345,8 @@ export function DashboardPage({ onNavigate }: Props) {
       const ram = Array.isArray(a.ram) ? a.ram[0] : a.ram;
       if (processorFilter !== "all" && proc !== processorFilter) return false;
       if (ramFilter !== "all" && ram !== ramFilter) return false;
+      if (categoryFilter !== "all" && a.category !== categoryFilter)
+        return false;
       return true;
     });
     if (ageFilter !== "all") {
@@ -340,7 +356,14 @@ export function DashboardPage({ onNavigate }: Props) {
       });
     }
     return result;
-  }, [assets, isSpecFiltered, processorFilter, ramFilter, ageFilter]);
+  }, [
+    assets,
+    isSpecFiltered,
+    processorFilter,
+    ramFilter,
+    ageFilter,
+    categoryFilter,
+  ]);
 
   // Source array: filtered or full
   const sourceAssets = isSpecFiltered ? filteredAssets : (assets ?? []);
@@ -757,6 +780,42 @@ export function DashboardPage({ onNavigate }: Props) {
           Filter Stats:
         </span>
 
+        {/* Category filter */}
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger
+            className="h-8 w-44 text-xs"
+            data-ocid="dashboard.select"
+          >
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categoryOptions.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Age filter */}
+        <Select value={ageFilter} onValueChange={setAgeFilter}>
+          <SelectTrigger
+            className="h-8 w-36 text-xs"
+            data-ocid="dashboard.select"
+          >
+            <SelectValue placeholder="All Ages" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Ages</SelectItem>
+            {ageOptions.map((opt) => (
+              <SelectItem key={opt.key} value={opt.key}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {/* Processor filter */}
         <Select value={processorFilter} onValueChange={setProcessorFilter}>
           <SelectTrigger
@@ -793,24 +852,6 @@ export function DashboardPage({ onNavigate }: Props) {
           </SelectContent>
         </Select>
 
-        {/* Age filter */}
-        <Select value={ageFilter} onValueChange={setAgeFilter}>
-          <SelectTrigger
-            className="h-8 w-36 text-xs"
-            data-ocid="dashboard.select"
-          >
-            <SelectValue placeholder="Age" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Ages</SelectItem>
-            {ageOptions.map((opt) => (
-              <SelectItem key={opt.key} value={opt.key}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         {/* Active filter indicators */}
         {isSpecFiltered && (
           <>
@@ -825,6 +866,7 @@ export function DashboardPage({ onNavigate }: Props) {
                 setProcessorFilter("all");
                 setRamFilter("all");
                 setAgeFilter("all");
+                setCategoryFilter("all");
               }}
               data-ocid="dashboard.secondary_button"
             >
@@ -834,7 +876,13 @@ export function DashboardPage({ onNavigate }: Props) {
         )}
       </div>
 
-      {/* KPI cards */}
+      {/* Hardware Summary */}
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Hardware Summary
+        </span>
+      </div>
       <div className={STAT_GRID[viewMode]}>
         {statsLoading || assetsLoading || softwareLoading ? (
           STAT_SKELETONS.map((k) => (
@@ -843,7 +891,7 @@ export function DashboardPage({ onNavigate }: Props) {
         ) : (
           <>
             <StatCard
-              label="Total Assets"
+              label="Total Hardware"
               value={
                 isSpecFiltered ? filteredTotal : stats ? Number(stats.total) : 0
               }

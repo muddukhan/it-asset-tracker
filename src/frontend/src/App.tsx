@@ -72,7 +72,7 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: "inventory",
-    label: "Inventory",
+    label: "Hardware",
     icon: <Package className="h-4 w-4" />,
   },
   {

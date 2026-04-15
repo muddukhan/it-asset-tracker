@@ -193,6 +193,10 @@ export function InventoryPage({
         a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (a.assignedUser?.toLowerCase().includes(searchTerm.toLowerCase()) ??
+          false) ||
+        ((a as { employeeCode?: string }).employeeCode
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ??
           false);
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       const matchCategory =
@@ -274,9 +278,9 @@ export function InventoryPage({
         )}
 
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory</h1>
+          <h1 className="text-3xl font-bold text-foreground">Hardware</h1>
           <p className="text-sm mt-0.5 text-muted-foreground">
-            Manage and track all your IT assets
+            Manage and track all your IT hardware assets
           </p>
         </div>
 
@@ -286,7 +290,7 @@ export function InventoryPage({
             <div className="flex-1 min-w-[180px] relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, serial, or user..."
+                placeholder="Search by name, serial, employee code, or user..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -432,7 +436,7 @@ export function InventoryPage({
           <div className="flex items-center justify-between px-5 py-4 border-b">
             <div>
               <h2 className="font-semibold text-base text-foreground">
-                Asset Inventory
+                Hardware Inventory
               </h2>
               <p className="text-xs mt-0.5 text-muted-foreground">
                 {filtered.length} asset{filtered.length !== 1 ? "s" : ""} found
