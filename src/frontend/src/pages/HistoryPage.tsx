@@ -79,6 +79,7 @@ function exportTransfersToCSV(
   const headers = [
     "Asset Name",
     "Asset ID",
+    "Serial No",
     "Transfer #",
     "From Employee",
     "To Employee",
@@ -107,6 +108,7 @@ function exportTransfersToCSV(
         [
           csvEscape(entry.assetName),
           csvEscape(assetKey),
+          csvEscape(entry.serialNumber ?? ""),
           csvEscape(String(idx + 1)),
           csvEscape(t.fromAssignee ?? ""),
           csvEscape(t.toAssignee ?? ""),
@@ -130,13 +132,26 @@ function exportTransfersToCSV(
 }
 
 // ─── Transfer track (timeline) for a single asset ───────────────────────────
-function TransferTrack({ entries }: { entries: LocalHistoryEntry[] }) {
+function TransferTrack({
+  entries,
+  serialNumber,
+}: {
+  entries: LocalHistoryEntry[];
+  serialNumber?: string;
+}) {
   const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp);
   return (
     <div className="px-4 pb-4 pt-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-        Full Transfer Trail — {sorted[0]?.assetName}
-      </p>
+      <div className="flex items-center gap-3 mb-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Full Transfer Trail — {sorted[0]?.assetName}
+        </p>
+        {serialNumber && (
+          <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
+            S/N: {serialNumber}
+          </span>
+        )}
+      </div>
       <ol
         className="relative border-l-2 border-dashed ml-2"
         style={{ borderColor: "oklch(var(--border))" }}
@@ -338,6 +353,9 @@ function TransferAssetList({
                     Asset Name
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                    Serial No
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">
                     Asset ID
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -394,6 +412,9 @@ function TransferAssetList({
                           {entry.assetName}
                         </TableCell>
                         <TableCell className="text-xs font-mono text-muted-foreground">
+                          {entry.serialNumber || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
                           #{assetKey}
                         </TableCell>
                         <TableCell className="text-sm">
@@ -427,7 +448,7 @@ function TransferAssetList({
                       <AnimatePresence key={`ap-${assetKey}`}>
                         {isOpen && (
                           <TableRow key={`${assetKey}-track`}>
-                            <TableCell colSpan={8} className="p-0 bg-muted/20">
+                            <TableCell colSpan={9} className="p-0 bg-muted/20">
                               <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
@@ -435,7 +456,10 @@ function TransferAssetList({
                                 transition={{ duration: 0.25 }}
                                 style={{ overflow: "hidden" }}
                               >
-                                <TransferTrack entries={trail} />
+                                <TransferTrack
+                                  entries={trail}
+                                  serialNumber={entry.serialNumber}
+                                />
                               </motion.div>
                             </TableCell>
                           </TableRow>
@@ -591,6 +615,9 @@ export function HistoryPage({ onBack }: { onBack?: () => void }) {
                           Asset
                         </TableHead>
                         <TableHead className="text-xs font-semibold uppercase tracking-wide">
+                          Serial No
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
                           Changed By
                         </TableHead>
                         <TableHead className="text-xs font-semibold uppercase tracking-wide">
@@ -616,6 +643,9 @@ export function HistoryPage({ onBack }: { onBack?: () => void }) {
                             <span className="block text-xs text-muted-foreground font-mono">
                               #{entry.assetId}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono text-muted-foreground">
+                            {entry.serialNumber || "—"}
                           </TableCell>
                           <TableCell className="text-xs font-mono text-muted-foreground">
                             {entry.changedBy}

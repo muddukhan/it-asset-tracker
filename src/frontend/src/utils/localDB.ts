@@ -59,6 +59,7 @@ export type LocalHistoryEntry = {
   id: number;
   assetId: number;
   assetName: string;
+  serialNumber?: string;
   changedBy: string;
   fromAssignee?: string;
   toAssignee?: string;
@@ -162,12 +163,14 @@ function recordHistory(
   fromAssignee: string | undefined,
   toAssignee: string | undefined,
   changedBy: string,
+  serialNumber?: string,
 ): void {
   const entries = readHistory();
   entries.push({
     id: nextHistoryId(),
     assetId,
     assetName,
+    serialNumber: serialNumber || undefined,
     changedBy,
     fromAssignee: fromAssignee || undefined,
     toAssignee: toAssignee || undefined,
@@ -329,6 +332,7 @@ export const localDB = {
       undefined,
       asset.assignedUser,
       "local-admin",
+      asset.serialNumber,
     );
     return asset;
   },
@@ -355,6 +359,7 @@ export const localDB = {
       prev.assignedUser,
       updated.assignedUser,
       "local-admin",
+      updated.serialNumber,
     );
     return updated;
   },
