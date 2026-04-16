@@ -59,7 +59,9 @@ import {
 import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ReLoginDialog } from "../components/ReLoginDialog";
 import { SoftwareImportDialog } from "../components/SoftwareImportDialog";
+import { useLocalSession } from "../context/LocalSessionContext";
 import { useIsCallerAdmin } from "../hooks/useQueries";
 import type {
   LocalSoftware,
@@ -154,6 +156,7 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
   const addSoftware = useAddSoftware();
   const updateSoftware = useUpdateSoftware();
   const deleteSoftware = useDeleteSoftware();
+  const localSession = useLocalSession();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [licenseFilter, setLicenseFilter] = useState<string>(
@@ -165,6 +168,8 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<LocalSoftware | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState<SoftwareForm>(EMPTY_FORM);
+  const [reLoginOpen, setReLoginOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
@@ -206,10 +211,10 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
       licenseKey: s.licenseKey ?? "",
       notes: s.notes ?? "",
       assignedTo: s.assignedTo ?? "",
-      assetTag: (s as any).assetTag ?? "",
-      invoiceNumber: (s as any).invoiceNumber ?? "",
-      invoiceFile: (s as any).invoiceFile ?? "",
-      invoiceFileName: (s as any).invoiceFileName ?? "",
+      assetTag: s.assetTag ?? "",
+      invoiceNumber: s.invoiceNumber ?? "",
+      invoiceFile: s.invoiceFile ?? "",
+      invoiceFileName: s.invoiceFileName ?? "",
     });
     setModalOpen(true);
   };
@@ -236,6 +241,11 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.vendor.trim()) {
       toast.error("Software name and vendor are required");
+      return;
+    }
+    if (!localSession?.password) {
+      setPendingAction(() => () => handleSubmit());
+      setReLoginOpen(true);
       return;
     }
     const input: LocalSoftwareInput = {
@@ -276,6 +286,19 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (!localSession?.password) {
+      setPendingAction(() => async () => {
+        try {
+          await deleteSoftware.mutateAsync(deleteTarget.id);
+          toast.success("Software deleted");
+          setDeleteTarget(null);
+        } catch {
+          toast.error("Failed to delete software");
+        }
+      });
+      setReLoginOpen(true);
+      return;
+    }
     try {
       await deleteSoftware.mutateAsync(deleteTarget.id);
       toast.success("Software deleted");
@@ -505,7 +528,7 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
                             {(page - 1) * PAGE_SIZE + i + 1}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {(sw as any).assetTag || "—"}
+                            {sw.assetTag || "—"}
                           </TableCell>
                           <TableCell className="font-medium text-sm">
                             {sw.name}
@@ -538,20 +561,17 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
                             {sw.vendor}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {(sw as any).invoiceNumber || "—"}
+                            {sw.invoiceNumber || "—"}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {(sw as any).invoiceFile ? (
+                            {sw.invoiceFile ? (
                               <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
                                   onClick={() =>
-                                    window.open(
-                                      (sw as any).invoiceFile,
-                                      "_blank",
-                                    )
+                                    window.open(sw.invoiceFile, "_blank")
                                   }
                                 >
                                   <ExternalLink className="h-3 w-3" />
@@ -572,7 +592,7 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
                                         vendor: sw.vendor,
                                         invoiceFile: undefined,
                                         invoiceFileName: undefined,
-                                      } as any,
+                                      } as LocalSoftwareInput,
                                     });
                                     toast.success("Invoice removed");
                                   }}
@@ -951,6 +971,22 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
         </AlertDialogContent>
       </AlertDialog>
       <SoftwareImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ReLoginDialog
+        open={reLoginOpen}
+        username={localSession?.username ?? ""}
+        onSuccess={() => {
+          setReLoginOpen(false);
+          if (pendingAction) {
+            const action = pendingAction;
+            setPendingAction(null);
+            action();
+          }
+        }}
+        onCancel={() => {
+          setReLoginOpen(false);
+          setPendingAction(null);
+        }}
+      />
     </TooltipProvider>
   );
 }

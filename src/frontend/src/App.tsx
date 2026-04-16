@@ -22,7 +22,12 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { LocalSessionContext } from "./context/LocalSessionContext";
+import {
+  LocalSessionContext,
+  clearPersistedSession,
+  loadPersistedSession,
+  persistSession,
+} from "./context/LocalSessionContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import {
   InternetIdentityProvider,
@@ -55,13 +60,10 @@ import type { LocalSession } from "./context/LocalSessionContext";
 export type { LocalSession } from "./context/LocalSessionContext";
 
 function loadLocalSession(): LocalSession | null {
-  try {
-    const raw = localStorage.getItem("localUserSession");
-    if (!raw) return null;
-    return JSON.parse(raw) as LocalSession;
-  } catch {
-    return null;
-  }
+  const persisted = loadPersistedSession();
+  if (!persisted) return null;
+  // password is empty — will be filled when user logs in interactively
+  return { ...persisted, password: "" };
 }
 
 const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
@@ -99,7 +101,7 @@ function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLocalLogout = () => {
-    localStorage.removeItem("localUserSession");
+    clearPersistedSession();
     setLocalSession(null);
   };
 
@@ -141,7 +143,14 @@ function AppShell() {
   }
 
   if (!identity && !localSession) {
-    return <LoginPage onLocalLogin={(session) => setLocalSession(session)} />;
+    return (
+      <LoginPage
+        onLocalLogin={(session) => {
+          persistSession(session);
+          setLocalSession(session);
+        }}
+      />
+    );
   }
 
   // Determine display name and initials
@@ -216,7 +225,7 @@ function AppShell() {
   }
 
   return (
-    <LocalSessionContext.Provider value={{ localSession }}>
+    <LocalSessionContext.Provider value={{ localSession, setLocalSession }}>
       <div
         id="app-root"
         className="min-h-screen flex flex-col bg-background"

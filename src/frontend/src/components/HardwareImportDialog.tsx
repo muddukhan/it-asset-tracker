@@ -68,16 +68,6 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
-/** Save windowsVersion into the separate localStorage map used by InventoryPage */
-function saveWindowsVersion(serialNumber: string, version: string) {
-  if (!serialNumber || !version) return;
-  const map: Record<string, string> = JSON.parse(
-    localStorage.getItem("asset_windows_versions") || "{}",
-  );
-  map[serialNumber] = version;
-  localStorage.setItem("asset_windows_versions", JSON.stringify(map));
-}
-
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
 export function HardwareImportDialog({ open, onOpenChange }: Props) {
@@ -105,7 +95,7 @@ export function HardwareImportDialog({ open, onOpenChange }: Props) {
     for (const row of rows) {
       try {
         const serialNumber = row.serialNumber || "";
-        const asset = await addAsset.mutateAsync({
+        await addAsset.mutateAsync({
           assetTag: row.assetTag || undefined,
           employeeCode: row.employeeCode || undefined,
           assignedUser: row.employeeName || undefined,
@@ -117,18 +107,13 @@ export function HardwareImportDialog({ open, onOpenChange }: Props) {
           processorType: row.processorType || undefined,
           ram: row.ram || undefined,
           storage: row.storage || undefined,
+          windowsVersion: row.windowsVersion || undefined,
           warrantyDate: row.warrantyDate || undefined,
           purchaseDate: row.purchaseDate || undefined,
           vendorName: row.vendorName || undefined,
           invoiceNumber: row.invoiceNumber || undefined,
           notes: row.notes || undefined,
         });
-        // Store Windows Version in the separate map keyed by serialNumber
-        if (row.windowsVersion && serialNumber) {
-          saveWindowsVersion(serialNumber, row.windowsVersion);
-        } else if (row.windowsVersion && asset?.serialNumber) {
-          saveWindowsVersion(asset.serialNumber, row.windowsVersion);
-        }
         success++;
       } catch {
         failed++;

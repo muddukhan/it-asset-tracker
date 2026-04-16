@@ -1,6 +1,22 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  Asset,
+  AssetInput,
+  FlexHistoryEntry,
+  LocalUser,
+  LocalUserInput,
+} from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
+import type {
+  LocalAsset,
+  LocalAssetInput,
+  LocalDBUser,
+  LocalDBUserInput,
+  LocalHistoryEntry,
+} from "../utils/localDB";
+import { fileToBase64 } from "../utils/localDB";
+import { useActor } from "./useActor";
 
 // Local type definitions (backend doesn't expose these — local auth only)
 export enum UserRole {
@@ -12,16 +28,6 @@ export interface UserWithRole {
   principal: Principal;
   role: UserRole;
 }
-import {
-  type LocalAsset,
-  type LocalAssetInput,
-  type LocalDBUser,
-  type LocalDBUserInput,
-  type LocalHistoryEntry,
-  fileToBase64,
-  localDB,
-} from "../utils/localDB";
-import { useActor } from "./useActor";
 
 export type {
   LocalAsset,
@@ -31,11 +37,164 @@ export type {
   LocalDBUserInput,
 };
 
+// ── Type transform helpers ────────────────────────────────────────────────────
+
+/** Normalize backend status enum to display-friendly capitalized string */
+function normalizeStatus(s: string): string {
+  const map: Record<string, string> = {
+    assigned: "Assigned",
+    available: "Available",
+    inRepair: "In Repair",
+    inStorage: "In Storage",
+    retired: "Retired",
+  };
+  return map[s] ?? s;
+}
+
+/** Normalize backend category enum to display-friendly capitalized string */
+function normalizeCategory(c: string): string {
+  const map: Record<string, string> = {
+    laptop: "Laptop",
+    desktop: "Desktop",
+    server: "Server",
+    printer: "Printer",
+    monitor: "Monitor",
+    peripheral: "Peripheral",
+    other: "Other",
+  };
+  return map[c] ?? c;
+}
+
+/** Map Motoko backend Asset to the frontend LocalAsset shape */
+function toFrontendAsset(a: Asset): LocalAsset {
+  return {
+    id: Number(a.id),
+    name: a.name,
+    serialNumber: a.serialNumber,
+    category: normalizeCategory(a.category),
+    status: normalizeStatus(a.status),
+    location: a.location,
+    assignedUser: a.assignedUser,
+    employeeCode: a.employeeCode,
+    purchaseDate: a.purchaseDate,
+    warrantyDate: a.warrantyDate,
+    notes: a.notes,
+    processorType: a.processorType,
+    ram: a.ram,
+    storage: a.storage,
+    assetTag: a.assetTag,
+    vendorName: a.vendorName,
+    invoiceNumber: a.invoiceNumber,
+    windowsVersion: a.windowsVersion,
+    createdAt: Number(a.createdAt),
+  };
+}
+
+/** Convert display status string back to backend enum value */
+function toBackendStatus(s: string): AssetInput["status"] {
+  const map: Record<string, AssetInput["status"]> = {
+    Assigned: "assigned" as AssetInput["status"],
+    Available: "available" as AssetInput["status"],
+    "In Repair": "inRepair" as AssetInput["status"],
+    "In Storage": "inStorage" as AssetInput["status"],
+    Retired: "retired" as AssetInput["status"],
+    assigned: "assigned" as AssetInput["status"],
+    available: "available" as AssetInput["status"],
+    inRepair: "inRepair" as AssetInput["status"],
+    inStorage: "inStorage" as AssetInput["status"],
+    retired: "retired" as AssetInput["status"],
+  };
+  return (map[s] ?? "available") as AssetInput["status"];
+}
+
+/** Convert display category string back to backend enum value */
+function toBackendCategory(c: string): AssetInput["category"] {
+  const map: Record<string, AssetInput["category"]> = {
+    Laptop: "laptop" as AssetInput["category"],
+    Desktop: "desktop" as AssetInput["category"],
+    Server: "server" as AssetInput["category"],
+    Printer: "printer" as AssetInput["category"],
+    Monitor: "monitor" as AssetInput["category"],
+    Peripheral: "peripheral" as AssetInput["category"],
+    Other: "other" as AssetInput["category"],
+    laptop: "laptop" as AssetInput["category"],
+    desktop: "desktop" as AssetInput["category"],
+    server: "server" as AssetInput["category"],
+    printer: "printer" as AssetInput["category"],
+    monitor: "monitor" as AssetInput["category"],
+    peripheral: "peripheral" as AssetInput["category"],
+    other: "other" as AssetInput["category"],
+  };
+  return (map[c] ?? "other") as AssetInput["category"];
+}
+
+/** Map frontend LocalAssetInput to backend AssetInput */
+function toBackendAssetInput(input: LocalAssetInput): AssetInput {
+  return {
+    name: input.name,
+    serialNumber: input.serialNumber,
+    category: toBackendCategory(input.category),
+    status: toBackendStatus(input.status),
+    location: input.location || "Unknown",
+    assignedUser: input.assignedUser,
+    employeeCode: input.employeeCode,
+    purchaseDate: input.purchaseDate,
+    warrantyDate: input.warrantyDate,
+    notes: input.notes,
+    processorType: input.processorType,
+    ram: input.ram,
+    storage: input.storage,
+    assetTag: input.assetTag,
+    vendorName: input.vendorName,
+    invoiceNumber: input.invoiceNumber,
+    windowsVersion: input.windowsVersion,
+  };
+}
+
+/** Map backend FlexHistoryEntry to frontend LocalHistoryEntry */
+function toFrontendHistory(h: FlexHistoryEntry): LocalHistoryEntry {
+  return {
+    id: Number(h.id),
+    assetId: Number(h.assetId),
+    assetName: h.assetName,
+    changedBy: h.changedBy,
+    fromAssignee: h.previousAssignee,
+    toAssignee: h.newAssignee,
+    fromStatus: "", // FlexHistoryEntry has no separate fromStatus — use empty to suppress "from → to" display
+    toStatus: h.action,
+    timestamp: Number(h.timestamp),
+  };
+}
+
+/** Map backend LocalUser to frontend LocalDBUser */
+function toFrontendUser(u: LocalUser): LocalDBUser {
+  return {
+    id: Number(u.id),
+    name: u.name,
+    username: u.username,
+    password: "", // never returned from backend
+    accessLevel: u.accessLevel,
+    employeeCode: u.employeeCode,
+    department: u.department,
+    email: u.email,
+    notes: u.notes,
+    createdAt: 0,
+  };
+}
+
+// ── Asset queries ─────────────────────────────────────────────────────────────
+
 export function useGetAllAssets() {
+  const { actor, isFetching } = useActor();
   return useQuery<LocalAsset[]>({
     queryKey: ["assets"],
-    queryFn: () => localDB.getAllAssets(),
-    staleTime: 0,
+    queryFn: async () => {
+      if (!actor) return [];
+      const assets = await actor.getAllAssets();
+      return assets.map(toFrontendAsset);
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 10_000,
   });
 }
 
@@ -45,65 +204,65 @@ export function useFilterAssets(
   _location: string | null,
   _searchTerm: string | null,
 ) {
-  return useQuery<LocalAsset[]>({
-    queryKey: ["assets"],
-    queryFn: () => localDB.getAllAssets(),
-    staleTime: 0,
-  });
+  return useGetAllAssets();
 }
 
 export function useGetStats() {
+  const assetsQuery = useGetAllAssets();
   return useQuery({
     queryKey: ["stats"],
     queryFn: () => {
-      const s = localDB.getStats();
+      const assets = assetsQuery.data ?? [];
       return {
-        total: BigInt(s.total),
-        available: BigInt(s.available),
-        assigned: BigInt(s.assigned),
-        inRepair: BigInt(s.inRepair),
+        total: BigInt(assets.length),
+        assigned: BigInt(assets.filter((a) => a.status === "Assigned").length),
+        available: BigInt(
+          assets.filter((a) => a.status === "Available").length,
+        ),
+        inRepair: BigInt(assets.filter((a) => a.status === "In Repair").length),
       };
     },
-    staleTime: 0,
+    enabled: assetsQuery.isSuccess,
+    staleTime: 10_000,
   });
 }
 
 export function useGetHistory() {
-  return useQuery({
+  const { actor, isFetching } = useActor();
+  return useQuery<LocalHistoryEntry[]>({
     queryKey: ["history"],
-    queryFn: () => localDB.getHistory(),
-    staleTime: 0,
+    queryFn: async () => {
+      if (!actor) return [];
+      const entries = await actor.getFlexHistory();
+      return entries
+        .map(toFrontendHistory)
+        .sort((a, b) => b.timestamp - a.timestamp);
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 15_000,
   });
 }
 
 export function useGetHistoryForAsset(assetId: number | null) {
-  return useQuery({
+  const { actor, isFetching } = useActor();
+  return useQuery<LocalHistoryEntry[]>({
     queryKey: ["history", "asset", assetId?.toString()],
-    queryFn: () => {
-      if (assetId === null) return [];
-      return localDB.getHistory().filter((e) => e.assetId === assetId);
+    queryFn: async () => {
+      if (!actor || assetId === null) return [];
+      const entries = await actor.getFlexHistoryForAsset(BigInt(assetId));
+      return entries.map(toFrontendHistory);
     },
-    enabled: assetId !== null,
-    staleTime: 0,
+    enabled: !!actor && !isFetching && assetId !== null,
+    staleTime: 15_000,
   });
 }
 
 export function useIsCallerAdmin() {
   const localSession = useLocalSession();
-  const { actor, isFetching } = useActor();
   return useQuery<boolean>({
     queryKey: ["isAdmin", localSession?.username],
-    queryFn: async () => {
-      if (localSession?.accessLevel === "admin") return true;
-      if (!actor) return false;
-      try {
-        return await actor.isCallerAdmin();
-      } catch {
-        return false;
-      }
-    },
+    queryFn: () => localSession?.accessLevel === "admin",
     initialData: localSession?.accessLevel === "admin" ? true : undefined,
-    enabled: localSession?.accessLevel !== "admin" && !!actor && !isFetching,
   });
 }
 
@@ -162,16 +321,31 @@ export function useGetAllUsersWithRoles(isAdmin: boolean) {
   });
 }
 
+// ── Asset mutations ───────────────────────────────────────────────────────────
+
 export function useAddAsset() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (input: LocalAssetInput & { photoFile?: File }) => {
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
         photoDataUrl = await fileToBase64(input.photoFile);
       }
-      const { photoFile: _photoFile, ...rest } = input;
-      return localDB.addAsset({ ...rest, photoDataUrl });
+      const { photoFile: _photoFile, photoDataUrl: _pd, ...rest } = input;
+      const backendInput = toBackendAssetInput({ ...rest, photoDataUrl });
+      await actor.addAssetWithCreds(
+        creds.username,
+        creds.password,
+        backendInput,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -182,7 +356,10 @@ export function useAddAsset() {
 }
 
 export function useUpdateAsset() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -191,12 +368,47 @@ export function useUpdateAsset() {
       id: number;
       input: Partial<LocalAssetInput> & { photoFile?: File };
     }) => {
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
         photoDataUrl = await fileToBase64(input.photoFile);
       }
-      const { photoFile: _photoFile, ...rest } = input;
-      return localDB.updateAsset(id, { ...rest, photoDataUrl });
+      const { photoFile: _photoFile, photoDataUrl: _pd, ...rest } = input;
+      const merged: LocalAssetInput = {
+        name: rest.name ?? "",
+        serialNumber: rest.serialNumber ?? "",
+        category: rest.category ?? "Other",
+        status: rest.status ?? "Available",
+        location: rest.location ?? "Unknown",
+        ...rest,
+        photoDataUrl,
+      };
+      const backendInput = toBackendAssetInput(merged);
+      await actor.updateAssetWithCreds(
+        creds.username,
+        creds.password,
+        BigInt(id),
+        backendInput,
+      );
+
+      // Record history entry for assignment tracking
+      try {
+        await actor.addHistoryEntryWithCreds(creds.username, creds.password, {
+          assetId: BigInt(id),
+          assetName: merged.name,
+          assetType: "hardware",
+          action: merged.status,
+          changedBy: creds.username,
+          newAssignee: merged.assignedUser,
+          timestamp: BigInt(Date.now()),
+        });
+      } catch {
+        // Non-fatal — history is best-effort
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -207,10 +419,21 @@ export function useUpdateAsset() {
 }
 
 export function useDeleteAsset() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (id: number) => {
-      return localDB.deleteAsset(id);
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+      await actor.deleteAssetWithCreds(
+        creds.username,
+        creds.password,
+        BigInt(id),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -219,24 +442,49 @@ export function useDeleteAsset() {
   });
 }
 
-// ── Local User Management ──
-// All local user operations use localDB (localStorage) directly.
-// This is intentional: the backend canister loses state on every deployment,
-// making credential-based auth unreliable. localStorage is permanent.
+// ── Local User Management ─────────────────────────────────────────────────────
 
 export function useGetAllLocalUsers() {
+  const { actor, isFetching } = useActor();
   return useQuery<LocalDBUser[]>({
     queryKey: ["localUsers"],
-    queryFn: () => localDB.getAllUsers(),
-    staleTime: 0,
+    queryFn: async () => {
+      if (!actor) return [];
+      const users = await actor.getAllLocalUsers();
+      return users.map(toFrontendUser);
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 30_000,
   });
 }
 
 export function useAddLocalUser() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (input: LocalDBUserInput) => {
-      return localDB.addUser(input);
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+
+      const userInput: LocalUserInput = {
+        username: input.username,
+        password: input.password,
+        name: input.name,
+        accessLevel: input.accessLevel,
+        employeeCode: input.employeeCode || "",
+        department: input.department || "",
+        email: input.email || "",
+        notes: input.notes,
+      };
+      await actor.addLocalUserWithCreds(
+        creds.username,
+        creds.password,
+        userInput,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -245,15 +493,36 @@ export function useAddLocalUser() {
 }
 
 export function useUpdateLocalUser() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       id,
       input,
     }: { id: number; input: LocalDBUserInput }) => {
-      const result = localDB.updateUser(id, input);
-      if (!result) throw new Error("User not found");
-      return result;
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+
+      const userInput: LocalUserInput = {
+        username: input.username,
+        password: input.password,
+        name: input.name,
+        accessLevel: input.accessLevel,
+        employeeCode: input.employeeCode || "",
+        department: input.department || "",
+        email: input.email || "",
+        notes: input.notes,
+      };
+      await actor.updateLocalUserWithCreds(
+        creds.username,
+        creds.password,
+        BigInt(id),
+        userInput,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -262,11 +531,21 @@ export function useUpdateLocalUser() {
 }
 
 export function useDeleteLocalUser() {
+  const { actor } = useActor();
+  const localSession = useLocalSession();
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (id: number) => {
-      const ok = localDB.deleteUser(id);
-      if (!ok) throw new Error("User not found");
+      if (!actor) throw new Error("Backend not ready");
+      const creds = localSession;
+      if (!creds?.username || !creds?.password)
+        throw new Error("Not authenticated");
+      await actor.deleteLocalUserWithCreds(
+        creds.username,
+        creds.password,
+        BigInt(id),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });

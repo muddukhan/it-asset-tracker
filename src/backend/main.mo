@@ -86,6 +86,7 @@ actor {
     assetTag : ?Text;
     vendorName : ?Text;
     invoiceNumber : ?Text;
+    windowsVersion : ?Text;
   };
 
   public type AssetInput = {
@@ -107,6 +108,7 @@ actor {
     assetTag : ?Text;
     vendorName : ?Text;
     invoiceNumber : ?Text;
+    windowsVersion : ?Text;
   };
 
   public type AssignmentHistoryEntry = {
@@ -119,6 +121,39 @@ actor {
     fromStatus : AssetStatus;
     toStatus : AssetStatus;
     timestamp : Time.Time;
+  };
+
+  // Flexible text-based history entry for frontend-driven writes and localStorage migration
+  public type HistoryEntryInput = {
+    assetId : Nat;
+    assetName : Text;
+    assetType : Text; // "hardware" or "software"
+    action : Text;
+    previousAssignee : ?Text;
+    newAssignee : ?Text;
+    changedBy : Text;
+    notes : ?Text;
+    timestamp : Int; // Unix milliseconds from frontend
+  };
+
+  public type FlexHistoryEntry = {
+    id : Nat;
+    assetId : Nat;
+    assetName : Text;
+    assetType : Text;
+    action : Text;
+    previousAssignee : ?Text;
+    newAssignee : ?Text;
+    changedBy : Text;
+    notes : ?Text;
+    timestamp : Int;
+  };
+
+  public type MigrationStats = {
+    assetCount : Nat;
+    softwareCount : Nat;
+    userCount : Nat;
+    historyCount : Nat;
   };
 
   public type Stats = {
@@ -276,12 +311,17 @@ actor {
   stable var stableAssetInvoiceNumbers : [(Nat, Text)] = [];
   stable var stableSoftwareAssetTags : [(Nat, Text)] = [];
   stable var stableSoftwareInvoiceNumbers : [(Nat, Text)] = [];
+  stable var stableAssetWindowsVersions : [(Nat, Text)] = [];
   stable var stableDataSaved : Bool = false;
+  stable var stableNextFlexHistoryId : Nat = 1;
+  stable var stableFlexHistory : [(Nat, FlexHistoryEntry)] = [];
+  stable var stableMigrationDone : Bool = false;
 
   var nextAssetId = 1;
   var nextHistoryId = 1;
   var nextLocalUserId = 1;
   var nextSoftwareId = 1;
+  var nextFlexHistoryId = 1;
 
   let assets = Map.empty<Nat, StoreAsset>();
   let history = Map.empty<Nat, StoreAssignmentHistoryEntry>();
@@ -298,6 +338,8 @@ actor {
   let assetInvoiceNumbers = Map.empty<Nat, Text>();
   let softwareAssetTags = Map.empty<Nat, Text>();
   let softwareInvoiceNumbers = Map.empty<Nat, Text>();
+  let assetWindowsVersions = Map.empty<Nat, Text>();
+  let flexHistory = Map.empty<Nat, FlexHistoryEntry>();
 
   // Helper: merge StoreAsset with all separate maps into the public Asset type
   func toAsset(s : StoreAsset) : Asset {
@@ -321,6 +363,7 @@ actor {
       assetTag = assetTags.get(s.id);
       vendorName = assetVendorNames.get(s.id);
       invoiceNumber = assetInvoiceNumbers.get(s.id);
+      windowsVersion = assetWindowsVersions.get(s.id);
     };
   };
 
@@ -393,7 +436,11 @@ actor {
     stableAssetInvoiceNumbers := assetInvoiceNumbers.entries().toArray();
     stableSoftwareAssetTags := softwareAssetTags.entries().toArray();
     stableSoftwareInvoiceNumbers := softwareInvoiceNumbers.entries().toArray();
+    stableAssetWindowsVersions := assetWindowsVersions.entries().toArray();
     stableDataSaved := not initialized.isEmpty();
+    stableNextFlexHistoryId := nextFlexHistoryId;
+    stableFlexHistory := flexHistory.entries().toArray();
+    stableMigrationDone := stableMigrationDone; // preserved as-is
   };
 
   system func postupgrade() {
@@ -435,6 +482,11 @@ actor {
     stableSoftwareAssetTags := [];
     for ((k, v) in stableSoftwareInvoiceNumbers.vals()) { softwareInvoiceNumbers.add(k, v) };
     stableSoftwareInvoiceNumbers := [];
+    for ((k, v) in stableAssetWindowsVersions.vals()) { assetWindowsVersions.add(k, v) };
+    stableAssetWindowsVersions := [];
+    if (stableNextFlexHistoryId > 1) { nextFlexHistoryId := stableNextFlexHistoryId };
+    for ((k, v) in stableFlexHistory.vals()) { flexHistory.add(k, v) };
+    stableFlexHistory := [];
 
     // Only seed sample data on first-ever run (not on upgrades)
     if (not stableDataSaved and initialized.isEmpty()) {
@@ -513,6 +565,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -533,6 +586,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -553,6 +607,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -573,6 +628,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -593,6 +649,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -613,6 +670,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -633,6 +691,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
       {
         id = null;
@@ -653,6 +712,7 @@ actor {
         assetTag = null;
         vendorName = null;
         invoiceNumber = null;
+        windowsVersion = null;
       },
     ];
 
@@ -699,6 +759,10 @@ actor {
     switch (input.invoiceNumber) {
       case (null) { assetInvoiceNumbers.remove(id) };
       case (?v) { assetInvoiceNumbers.add(id, v) };
+    };
+    switch (input.windowsVersion) {
+      case (null) { assetWindowsVersions.remove(id) };
+      case (?v) { assetWindowsVersions.add(id, v) };
     };
 
     id;
@@ -956,6 +1020,10 @@ actor {
           case (null) { assetInvoiceNumbers.remove(id) };
           case (?v) { assetInvoiceNumbers.add(id, v) };
         };
+        switch (input.windowsVersion) {
+          case (null) { assetWindowsVersions.remove(id) };
+          case (?v) { assetWindowsVersions.add(id, v) };
+        };
 
         addToHistory(id, caller, existing.status, input);
         assets.add(id, updated);
@@ -972,6 +1040,7 @@ actor {
     assetTags.remove(id);
     assetVendorNames.remove(id);
     assetInvoiceNumbers.remove(id);
+    assetWindowsVersions.remove(id);
   };
 
   public query ({ caller }) func getAsset(id : Nat) : async Asset {
@@ -1136,6 +1205,114 @@ actor {
     accessControlState.userRoles.add(user, role);
   };
 
+  // ── getUserByUsername ─────────────────────────────────────────────────────
+  public query func getUserByUsername(username : Text) : async ?LocalUser {
+    var result : ?LocalUser = null;
+    for ((id, creds) in localUserCredentials.entries()) {
+      if (creds.username == username) {
+        switch (localUsers.get(id)) {
+          case (?u) { result := ?toLocalUser(u) };
+          case (null) {};
+        };
+      };
+    };
+    result;
+  };
+
+  // ── Flex history write (text-based, for frontend migration and runtime writes) ──
+  func addFlexHistoryInternal(entry : HistoryEntryInput) : Nat {
+    let id = nextFlexHistoryId;
+    nextFlexHistoryId += 1;
+    let stored : FlexHistoryEntry = {
+      id;
+      assetId = entry.assetId;
+      assetName = entry.assetName;
+      assetType = entry.assetType;
+      action = entry.action;
+      previousAssignee = entry.previousAssignee;
+      newAssignee = entry.newAssignee;
+      changedBy = entry.changedBy;
+      notes = entry.notes;
+      timestamp = entry.timestamp;
+    };
+    flexHistory.add(id, stored);
+    id;
+  };
+
+  public shared func addHistoryEntry(entry : HistoryEntryInput) : async Nat {
+    addFlexHistoryInternal(entry);
+  };
+
+  public shared ({ caller }) func addHistoryEntryWithCreds(adminUsername : Text, adminPassword : Text, entry : HistoryEntryInput) : async Nat {
+    if (not isAdminCallerOrCreds(caller, adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can write history");
+    };
+    addFlexHistoryInternal(entry);
+  };
+
+  public query func getFlexHistory() : async [FlexHistoryEntry] {
+    flexHistory.values().toArray();
+  };
+
+  public query func getFlexHistoryForAsset(assetId : Nat) : async [FlexHistoryEntry] {
+    flexHistory.values().filter(func(e : FlexHistoryEntry) : Bool { e.assetId == assetId }).toArray();
+  };
+
+  // ── Batch migration methods ───────────────────────────────────────────────
+  public shared func batchAddAssets(inputs : [AssetInput]) : async [Nat] {
+    inputs.map(addAssetInternal);
+  };
+
+  public shared func batchAddSoftware(inputs : [StoreSoftwareInput]) : async [Nat] {
+    inputs.map(addSoftwareInternal);
+  };
+
+  public shared func batchAddUsers(inputs : [LocalUserInput]) : async [Nat] {
+    inputs.map(func(input : LocalUserInput) : Nat {
+      let id = nextLocalUserId;
+      nextLocalUserId += 1;
+      let localUser : StoreLocalUser = {
+        id;
+        name = input.name;
+        employeeCode = input.employeeCode;
+        department = input.department;
+        email = input.email;
+        notes = input.notes;
+      };
+      let creds : StoreLocalUserCredentials = {
+        username = input.username;
+        password = input.password;
+        accessLevel = input.accessLevel;
+      };
+      localUsers.add(id, localUser);
+      localUserCredentials.add(id, creds);
+      id;
+    });
+  };
+
+  public shared func batchAddHistory(entries : [HistoryEntryInput]) : async [Nat] {
+    entries.map(addFlexHistoryInternal);
+  };
+
+  // ── Migration guard ───────────────────────────────────────────────────────
+  public query func hasMigratedFromLocalStorage() : async Bool {
+    stableMigrationDone or assets.size() > 0 or softwareInventory.size() > 0 or localUsers.size() > 0;
+  };
+
+  public shared func markMigrationComplete() : async () {
+    stableMigrationDone := true;
+  };
+
+  // ── Full stats for migration verification ─────────────────────────────────
+  public query func getMigrationStats() : async MigrationStats {
+    {
+      assetCount = assets.size();
+      softwareCount = softwareInventory.size();
+      userCount = localUsers.size();
+      historyCount = flexHistory.size();
+    };
+  };
+
 
 // ── Credential-based write operations for local admin users ──────────────────
 
@@ -1186,6 +1363,10 @@ actor {
           case (null) { assetInvoiceNumbers.remove(id) };
           case (?v) { assetInvoiceNumbers.add(id, v) };
         };
+        switch (input.windowsVersion) {
+          case (null) { assetWindowsVersions.remove(id) };
+          case (?v) { assetWindowsVersions.add(id, v) };
+        };
         addToHistory(id, caller, existing.status, input);
         assets.add(id, updated);
       };
@@ -1201,6 +1382,7 @@ actor {
     assetTags.remove(id);
     assetVendorNames.remove(id);
     assetInvoiceNumbers.remove(id);
+    assetWindowsVersions.remove(id);
   };
 
   public shared ({ caller }) func addSoftwareWithCreds(adminUsername : Text, adminPassword : Text, input : StoreSoftwareInput) : async Nat {

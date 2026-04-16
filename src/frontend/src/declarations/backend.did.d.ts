@@ -15,6 +15,7 @@ export interface Asset {
   'ram' : [] | [string],
   'status' : AssetStatus,
   'employeeCode' : [] | [string],
+  'windowsVersion' : [] | [string],
   'purchaseDate' : [] | [string],
   'storage' : [] | [string],
   'name' : string,
@@ -43,6 +44,7 @@ export interface AssetInput {
   'ram' : [] | [string],
   'status' : AssetStatus,
   'employeeCode' : [] | [string],
+  'windowsVersion' : [] | [string],
   'purchaseDate' : [] | [string],
   'storage' : [] | [string],
   'name' : string,
@@ -75,6 +77,29 @@ export interface AssignmentHistoryEntry {
   'fromAssignee' : [] | [string],
 }
 export type ExternalBlob = Uint8Array;
+export interface FlexHistoryEntry {
+  'id' : bigint,
+  'action' : string,
+  'changedBy' : string,
+  'newAssignee' : [] | [string],
+  'assetId' : bigint,
+  'notes' : [] | [string],
+  'timestamp' : bigint,
+  'assetName' : string,
+  'assetType' : string,
+  'previousAssignee' : [] | [string],
+}
+export interface HistoryEntryInput {
+  'action' : string,
+  'changedBy' : string,
+  'newAssignee' : [] | [string],
+  'assetId' : bigint,
+  'notes' : [] | [string],
+  'timestamp' : bigint,
+  'assetName' : string,
+  'assetType' : string,
+  'previousAssignee' : [] | [string],
+}
 export interface LocalUser {
   'id' : bigint,
   'accessLevel' : string,
@@ -94,6 +119,12 @@ export interface LocalUserInput {
   'email' : string,
   'notes' : [] | [string],
   'department' : string,
+}
+export interface MigrationStats {
+  'historyCount' : bigint,
+  'softwareCount' : bigint,
+  'userCount' : bigint,
+  'assetCount' : bigint,
 }
 export type Principal = Principal;
 export interface Stats {
@@ -171,6 +202,11 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
   'addAssetWithCreds' : ActorMethod<[string, string, AssetInput], bigint>,
+  'addHistoryEntry' : ActorMethod<[HistoryEntryInput], bigint>,
+  'addHistoryEntryWithCreds' : ActorMethod<
+    [string, string, HistoryEntryInput],
+    bigint
+  >,
   'addLocalUser' : ActorMethod<[LocalUserInput], bigint>,
   'addLocalUserWithCreds' : ActorMethod<
     [string, string, LocalUserInput],
@@ -183,6 +219,10 @@ export interface _SERVICE {
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'assignRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'batchAddAssets' : ActorMethod<[Array<AssetInput>], Array<bigint>>,
+  'batchAddHistory' : ActorMethod<[Array<HistoryEntryInput>], Array<bigint>>,
+  'batchAddSoftware' : ActorMethod<[Array<StoreSoftwareInput>], Array<bigint>>,
+  'batchAddUsers' : ActorMethod<[Array<LocalUserInput>], Array<bigint>>,
   'bootstrapAdmin' : ActorMethod<[], boolean>,
   'createFirstLocalUser' : ActorMethod<
     [LocalUserInput],
@@ -205,18 +245,24 @@ export interface _SERVICE {
   'getAssetsByStatus' : ActorMethod<[AssetStatus], Array<Asset>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getFlexHistory' : ActorMethod<[], Array<FlexHistoryEntry>>,
+  'getFlexHistoryForAsset' : ActorMethod<[bigint], Array<FlexHistoryEntry>>,
   'getHistory' : ActorMethod<[], Array<AssignmentHistoryEntry>>,
   'getHistoryForAsset' : ActorMethod<[bigint], Array<AssignmentHistoryEntry>>,
+  'getMigrationStats' : ActorMethod<[], MigrationStats>,
   'getStats' : ActorMethod<[], Stats>,
+  'getUserByUsername' : ActorMethod<[string], [] | [LocalUser]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWarrantyStats' : ActorMethod<[], WarrantyStats>,
   'hasLocalUsers' : ActorMethod<[], boolean>,
+  'hasMigratedFromLocalStorage' : ActorMethod<[], boolean>,
   'isAdminWithCreds' : ActorMethod<[string, string], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'loginLocalUser' : ActorMethod<
     [string, string],
     [] | [{ 'id' : bigint, 'accessLevel' : string, 'name' : string }]
   >,
+  'markMigrationComplete' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,
   'selfRegisterLocalUser' : ActorMethod<

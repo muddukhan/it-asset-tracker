@@ -145,20 +145,20 @@ function exportHardwareCSV(assets: Asset[]) {
     a.name,
     a.category,
     a.serialNumber,
-    (a as any).assetTag ?? "",
+    a.assetTag ?? "",
     a.assignedUser ?? "",
-    (a.employeeCode as string | undefined) ?? "",
+    a.employeeCode ?? "",
     a.location,
     a.status,
     formatDateForExport(a.purchaseDate),
-    formatDateForExport(a.warrantyDate as string | undefined),
-    getWarrantyStatus(a.warrantyDate as string | null | undefined),
-    (a as any).vendorName ?? "",
-    (a as any).invoiceNumber ?? "",
-    (a as any).invoiceFile ? "Yes" : "No",
-    (a.processorType as string | undefined) ?? "",
-    (a.ram as string | undefined) ?? "",
-    (a.storage as string | undefined) ?? "",
+    formatDateForExport(a.warrantyDate),
+    getWarrantyStatus(a.warrantyDate),
+    a.vendorName ?? "",
+    a.invoiceNumber ?? "",
+    a.invoiceFile ? "Yes" : "No",
+    a.processorType ?? "",
+    a.ram ?? "",
+    a.storage ?? "",
     a.notes ?? "",
   ]);
   downloadCSV(
@@ -212,13 +212,11 @@ function exportSoftwareCSV(software: StoreSoftware[]) {
     s.vendor,
     formatDateForExport(s.purchaseDate),
     formatDateForExport(s.licenseExpiry),
-    LICENSE_STATUS_LABEL[
-      getSoftwareLicenseStatus(s.licenseExpiry as string | null | undefined)
-    ],
+    LICENSE_STATUS_LABEL[getSoftwareLicenseStatus(s.licenseExpiry)],
     s.licenseType ?? "",
     s.licenseKey ?? "",
     s.invoiceNumber ?? "",
-    (s as any).invoiceFile ? "Yes" : "No",
+    s.invoiceFile ? "Yes" : "No",
     s.notes ?? "",
   ]);
   downloadCSV(
@@ -242,8 +240,8 @@ export function ReportsPage({ onBack }: { onBack?: () => void }) {
       if (!counts[a.category])
         counts[a.category] = { total: 0, assigned: 0, available: 0 };
       counts[a.category].total++;
-      if (a.status === "assigned") counts[a.category].assigned++;
-      if (a.status === "available") counts[a.category].available++;
+      if (a.status === "Assigned") counts[a.category].assigned++;
+      if (a.status === "Available") counts[a.category].available++;
     }
     return Object.entries(counts)
       .map(([cat, c]) => ({ category: cat, ...c }))

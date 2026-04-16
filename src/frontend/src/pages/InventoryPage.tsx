@@ -46,7 +46,9 @@ import { AssetModal } from "../components/AssetModal";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 import { EditConfirmDialog } from "../components/EditConfirmDialog";
 import { HardwareImportDialog } from "../components/HardwareImportDialog";
+import { ReLoginDialog } from "../components/ReLoginDialog";
 import { StatusBadge } from "../components/StatusBadge";
+import { useLocalSession } from "../context/LocalSessionContext";
 import {
   useDeleteAsset,
   useGetAllAssets,
@@ -95,14 +97,6 @@ function WarrantyBadge({ warrantyDate }: { warrantyDate?: string }) {
   );
 }
 
-function getWindowsVersions(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem("asset_windows_versions") || "{}");
-  } catch {
-    return {};
-  }
-}
-
 function getPurchaseYear(purchaseDate?: string): string {
   if (!purchaseDate) return "—";
   const d = new Date(purchaseDate);
@@ -129,6 +123,7 @@ export function InventoryPage({
   const { data: isAdmin } = useIsCallerAdmin();
   const deleteAsset = useDeleteAsset();
   const updateAsset = useUpdateAsset();
+  const localSession = useLocalSession();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(
@@ -149,6 +144,8 @@ export function InventoryPage({
   const [detailAsset, setDetailAsset] = useState<LocalAsset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LocalAsset | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [reLoginOpen, setReLoginOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   // Track whether we've already auto-opened the asset from initialAssetId
   const [autoOpenDone, setAutoOpenDone] = useState(false);
 
@@ -164,7 +161,6 @@ export function InventoryPage({
   }, [initialAssetId, assets, autoOpenDone]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: addModalOpen triggers refresh after modal close
-  const windowsVersions = useMemo(() => getWindowsVersions(), [addModalOpen]);
 
   // Derive unique processor and RAM values from assets for filter dropdowns
   const processorOptions = useMemo(() => {
@@ -194,9 +190,7 @@ export function InventoryPage({
         a.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (a.assignedUser?.toLowerCase().includes(searchTerm.toLowerCase()) ??
           false) ||
-        ((a as { employeeCode?: string }).employeeCode
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase()) ??
+        (a.employeeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ??
           false);
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       const matchCategory =
@@ -206,9 +200,7 @@ export function InventoryPage({
       const matchRam = ramFilter === "all" || a.ram === ramFilter;
       const matchAge = (() => {
         if (ageFilter === "all") return true;
-        const pd = Array.isArray(a.purchaseDate)
-          ? a.purchaseDate[0]
-          : (a.purchaseDate as string | undefined);
+        const pd = a.purchaseDate;
         if (!pd) return ageFilter === "unknown";
         const ageYears =
           (Date.now() - new Date(pd).getTime()) /
@@ -245,6 +237,19 @@ export function InventoryPage({
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (!localSession?.password) {
+      setPendingAction(() => async () => {
+        try {
+          await deleteAsset.mutateAsync(deleteTarget.id);
+          toast.success("Asset deleted");
+          setDeleteTarget(null);
+        } catch {
+          toast.error("Failed to delete asset");
+        }
+      });
+      setReLoginOpen(true);
+      return;
+    }
     try {
       await deleteAsset.mutateAsync(deleteTarget.id);
       toast.success("Asset deleted");
@@ -569,9 +574,7 @@ export function InventoryPage({
                   <TableBody>
                     {paginated.map((asset, i) => {
                       const rowIdx = (page - 1) * PAGE_SIZE + i + 1;
-                      const pd = Array.isArray(asset.purchaseDate)
-                        ? asset.purchaseDate[0]
-                        : (asset.purchaseDate as string | undefined);
+                      const pd = asset.purchaseDate;
                       return (
                         <TableRow
                           key={String(asset.id)}
@@ -614,7 +617,7 @@ export function InventoryPage({
                             {asset.assignedUser || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground font-mono">
-                            {(asset as any).employeeCode || "—"}
+                            {asset.employeeCode || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {asset.location}
@@ -669,26 +672,23 @@ export function InventoryPage({
                             {getAssetAgeLabel(pd)}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {windowsVersions[asset.serialNumber] || "—"}
+                            {asset.windowsVersion || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[140px]">
                             <span className="truncate block">
-                              {(asset as any).notes || "—"}
+                              {asset.notes || "—"}
                             </span>
                           </TableCell>
                           {/* Invoice column */}
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            {(asset as any).invoiceFile ? (
+                            {asset.invoiceFile ? (
                               <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-xs"
                                   onClick={() =>
-                                    window.open(
-                                      (asset as any).invoiceFile,
-                                      "_blank",
-                                    )
+                                    window.open(asset.invoiceFile, "_blank")
                                   }
                                   data-ocid={`inventory.secondary_button.${rowIdx}`}
                                 >
@@ -705,6 +705,11 @@ export function InventoryPage({
                                     await updateAsset.mutateAsync({
                                       id: asset.id,
                                       input: {
+                                        name: asset.name,
+                                        serialNumber: asset.serialNumber,
+                                        category: asset.category,
+                                        status: asset.status,
+                                        location: asset.location,
                                         invoiceFile: undefined,
                                         invoiceFileName: undefined,
                                       },
@@ -856,6 +861,22 @@ export function InventoryPage({
           isPending={deleteAsset.isPending}
         />
         <HardwareImportDialog open={importOpen} onOpenChange={setImportOpen} />
+        <ReLoginDialog
+          open={reLoginOpen}
+          username={localSession?.username ?? ""}
+          onSuccess={() => {
+            setReLoginOpen(false);
+            if (pendingAction) {
+              const action = pendingAction;
+              setPendingAction(null);
+              action();
+            }
+          }}
+          onCancel={() => {
+            setReLoginOpen(false);
+            setPendingAction(null);
+          }}
+        />
       </div>
     </TooltipProvider>
   );

@@ -35,6 +35,8 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ReLoginDialog } from "../components/ReLoginDialog";
+import { useLocalSession } from "../context/LocalSessionContext";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   UserRole,
@@ -493,21 +495,11 @@ function LocalUserRow({
 
 function AddLocalUserForm({ onClose }: { onClose: () => void }) {
   const addMutation = useAddLocalUser();
+  const localSession = useLocalSession();
   const [form, setForm] = useState<LocalUserFormInput>(emptyForm());
+  const [reLoginOpen, setReLoginOpen] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    if (!form.username.trim()) {
-      toast.error("Username is required");
-      return;
-    }
-    if (!form.password.trim()) {
-      toast.error("Password is required");
-      return;
-    }
+  const doSubmit = async () => {
     try {
       await addMutation.mutateAsync({
         name: form.name,
@@ -524,6 +516,26 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to add user");
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!form.username.trim()) {
+      toast.error("Username is required");
+      return;
+    }
+    if (!form.password.trim()) {
+      toast.error("Password is required");
+      return;
+    }
+    if (!localSession?.password) {
+      setReLoginOpen(true);
+      return;
+    }
+    await doSubmit();
   };
 
   return (
@@ -670,6 +682,15 @@ function AddLocalUserForm({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </div>
+      <ReLoginDialog
+        open={reLoginOpen}
+        username={localSession?.username ?? ""}
+        onSuccess={() => {
+          setReLoginOpen(false);
+          doSubmit();
+        }}
+        onCancel={() => setReLoginOpen(false)}
+      />
     </motion.div>
   );
 }

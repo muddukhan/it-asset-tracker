@@ -87,14 +87,12 @@ const AGE_BUCKETS_TEMPLATE: Omit<AgeBucket, "count">[] = [
   { key: "unknown", label: "Unknown" },
 ];
 
-function getAgeYears(
-  purchaseDate: string | string[] | undefined | null,
-): number | null {
-  const pd = Array.isArray(purchaseDate)
-    ? purchaseDate[0]
-    : (purchaseDate as string | undefined);
-  if (!pd) return null;
-  return (Date.now() - new Date(pd).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+function getAgeYears(purchaseDate: string | undefined | null): number | null {
+  if (!purchaseDate) return null;
+  return (
+    (Date.now() - new Date(purchaseDate).getTime()) /
+    (1000 * 60 * 60 * 24 * 365.25)
+  );
 }
 
 function bucketAgeKey(ageYears: number | null): string {
@@ -296,15 +294,11 @@ export function DashboardPage({ onNavigate }: Props) {
     day: "numeric",
   });
 
-  // Dynamically build processor, RAM, and category options from assets
   const processorOptions = useMemo(() => {
     if (!assets) return [];
     const seen = new Set<string>();
     for (const a of assets) {
-      const val = Array.isArray(a.processorType)
-        ? a.processorType[0]
-        : a.processorType;
-      if (val && typeof val === "string" && val.trim()) seen.add(val.trim());
+      if (a.processorType?.trim()) seen.add(a.processorType.trim());
     }
     return Array.from(seen).sort();
   }, [assets]);
@@ -313,8 +307,7 @@ export function DashboardPage({ onNavigate }: Props) {
     if (!assets) return [];
     const seen = new Set<string>();
     for (const a of assets) {
-      const val = Array.isArray(a.ram) ? a.ram[0] : a.ram;
-      if (val && typeof val === "string" && val.trim()) seen.add(val.trim());
+      if (a.ram?.trim()) seen.add(a.ram.trim());
     }
     return Array.from(seen).sort();
   }, [assets]);
@@ -339,12 +332,9 @@ export function DashboardPage({ onNavigate }: Props) {
   const filteredAssets = useMemo(() => {
     if (!assets || !isSpecFiltered) return assets ?? [];
     let result = assets.filter((a) => {
-      const proc = Array.isArray(a.processorType)
-        ? a.processorType[0]
-        : a.processorType;
-      const ram = Array.isArray(a.ram) ? a.ram[0] : a.ram;
-      if (processorFilter !== "all" && proc !== processorFilter) return false;
-      if (ramFilter !== "all" && ram !== ramFilter) return false;
+      if (processorFilter !== "all" && a.processorType !== processorFilter)
+        return false;
+      if (ramFilter !== "all" && a.ram !== ramFilter) return false;
       if (categoryFilter !== "all" && a.category !== categoryFilter)
         return false;
       return true;
@@ -505,9 +495,7 @@ export function DashboardPage({ onNavigate }: Props) {
     const expiringWarn: typeof softwareList = [];
 
     for (const sw of softwareList) {
-      const expiryStr = Array.isArray(sw.licenseExpiry)
-        ? sw.licenseExpiry[0]
-        : sw.licenseExpiry;
+      const expiryStr = sw.licenseExpiry;
       if (!expiryStr) continue;
       const expiryDate = new Date(expiryStr);
       if (Number.isNaN(expiryDate.getTime())) continue;
@@ -526,10 +514,9 @@ export function DashboardPage({ onNavigate }: Props) {
     const atRisk = [...expired, ...expiringSoon, ...expiringWarn].sort(
       (a, b) => {
         const getExpiry = (s: typeof a) => {
-          const str = Array.isArray(s.licenseExpiry)
-            ? s.licenseExpiry[0]
-            : s.licenseExpiry;
-          return str ? new Date(str).getTime() : Number.POSITIVE_INFINITY;
+          return s.licenseExpiry
+            ? new Date(s.licenseExpiry).getTime()
+            : Number.POSITIVE_INFINITY;
         };
         return getExpiry(a) - getExpiry(b);
       },
@@ -548,9 +535,7 @@ export function DashboardPage({ onNavigate }: Props) {
   const softwareTotalCount = softwareList ? softwareList.length : 0;
   const softwareActiveCount = softwareList
     ? softwareList.filter((sw) => {
-        const expiryStr = Array.isArray(sw.licenseExpiry)
-          ? sw.licenseExpiry[0]
-          : sw.licenseExpiry;
+        const expiryStr = sw.licenseExpiry;
         if (!expiryStr) return true; // no expiry = active
         const expiryDate = new Date(expiryStr);
         if (Number.isNaN(expiryDate.getTime())) return true;
@@ -1580,9 +1565,7 @@ export function DashboardPage({ onNavigate }: Props) {
           ) : (
             <ul className="divide-y">
               {softwareAtRisk.map((sw, i) => {
-                const expiryStr = Array.isArray(sw.licenseExpiry)
-                  ? sw.licenseExpiry[0]
-                  : sw.licenseExpiry;
+                const expiryStr = sw.licenseExpiry;
                 const expiryDate = expiryStr ? new Date(expiryStr) : null;
                 const daysUntil = expiryDate
                   ? Math.floor(

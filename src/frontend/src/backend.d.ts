@@ -25,6 +25,12 @@ export interface UserWithRole {
     principal: Principal;
     role: UserRole;
 }
+export interface MigrationStats {
+    historyCount: bigint;
+    softwareCount: bigint;
+    userCount: bigint;
+    assetCount: bigint;
+}
 export interface Stats {
     assigned: bigint;
     total: bigint;
@@ -32,6 +38,17 @@ export interface Stats {
     inRepair: bigint;
 }
 export type Principal = Principal;
+export interface HistoryEntryInput {
+    action: string;
+    changedBy: string;
+    newAssignee?: string;
+    assetId: bigint;
+    notes?: string;
+    timestamp: bigint;
+    assetName: string;
+    assetType: string;
+    previousAssignee?: string;
+}
 export interface AssignmentHistoryEntry {
     id: bigint;
     changedBy: Principal;
@@ -76,11 +93,24 @@ export interface LocalUserInput {
     notes?: string;
     department: string;
 }
+export interface FlexHistoryEntry {
+    id: bigint;
+    action: string;
+    changedBy: string;
+    newAssignee?: string;
+    assetId: bigint;
+    notes?: string;
+    timestamp: bigint;
+    assetName: string;
+    assetType: string;
+    previousAssignee?: string;
+}
 export interface AssetInput {
     id?: bigint;
     ram?: string;
     status: AssetStatus;
     employeeCode?: string;
+    windowsVersion?: string;
     purchaseDate?: string;
     storage?: string;
     name: string;
@@ -101,6 +131,7 @@ export interface Asset {
     ram?: string;
     status: AssetStatus;
     employeeCode?: string;
+    windowsVersion?: string;
     purchaseDate?: string;
     storage?: string;
     name: string;
@@ -158,12 +189,18 @@ export enum UserRole {
 export interface backendInterface {
     addAsset(input: AssetInput): Promise<bigint>;
     addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
+    addHistoryEntry(entry: HistoryEntryInput): Promise<bigint>;
+    addHistoryEntryWithCreds(adminUsername: string, adminPassword: string, entry: HistoryEntryInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
     addLocalUserWithCreds(adminUsername: string, adminPassword: string, input: LocalUserInput): Promise<bigint>;
     addSoftware(input: StoreSoftwareInput): Promise<bigint>;
     addSoftwareWithCreds(adminUsername: string, adminPassword: string, input: StoreSoftwareInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     assignRole(user: Principal, role: UserRole): Promise<void>;
+    batchAddAssets(inputs: Array<AssetInput>): Promise<Array<bigint>>;
+    batchAddHistory(entries: Array<HistoryEntryInput>): Promise<Array<bigint>>;
+    batchAddSoftware(inputs: Array<StoreSoftwareInput>): Promise<Array<bigint>>;
+    batchAddUsers(inputs: Array<LocalUserInput>): Promise<Array<bigint>>;
     bootstrapAdmin(): Promise<boolean>;
     createFirstLocalUser(input: LocalUserInput): Promise<{
         __kind__: "ok";
@@ -188,12 +225,17 @@ export interface backendInterface {
     getAssetsByStatus(status: AssetStatus): Promise<Array<Asset>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getFlexHistory(): Promise<Array<FlexHistoryEntry>>;
+    getFlexHistoryForAsset(assetId: bigint): Promise<Array<FlexHistoryEntry>>;
     getHistory(): Promise<Array<AssignmentHistoryEntry>>;
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
+    getMigrationStats(): Promise<MigrationStats>;
     getStats(): Promise<Stats>;
+    getUserByUsername(username: string): Promise<LocalUser | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWarrantyStats(): Promise<WarrantyStats>;
     hasLocalUsers(): Promise<boolean>;
+    hasMigratedFromLocalStorage(): Promise<boolean>;
     isAdminWithCreds(adminUsername: string, adminPassword: string): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     loginLocalUser(username: string, password: string): Promise<{
@@ -201,6 +243,7 @@ export interface backendInterface {
         accessLevel: string;
         name: string;
     } | null>;
+    markMigrationComplete(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
     selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean>;

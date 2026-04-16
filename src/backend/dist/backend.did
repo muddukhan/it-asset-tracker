@@ -67,6 +67,13 @@ type Stats =
    total: nat;
  };
 type Principal = principal;
+type MigrationStats = 
+ record {
+   assetCount: nat;
+   historyCount: nat;
+   softwareCount: nat;
+   userCount: nat;
+ };
 type LocalUserInput = 
  record {
    accessLevel: text;
@@ -88,6 +95,31 @@ type LocalUser =
    name: text;
    notes: opt text;
    username: text;
+ };
+type HistoryEntryInput = 
+ record {
+   action: text;
+   assetId: nat;
+   assetName: text;
+   assetType: text;
+   changedBy: text;
+   newAssignee: opt text;
+   notes: opt text;
+   previousAssignee: opt text;
+   timestamp: int;
+ };
+type FlexHistoryEntry = 
+ record {
+   action: text;
+   assetId: nat;
+   assetName: text;
+   assetType: text;
+   changedBy: text;
+   id: nat;
+   newAssignee: opt text;
+   notes: opt text;
+   previousAssignee: opt text;
+   timestamp: int;
  };
 type ExternalBlob = blob;
 type AssignmentHistoryEntry = 
@@ -130,6 +162,7 @@ type AssetInput =
    storage: opt text;
    vendorName: opt text;
    warrantyDate: opt text;
+   windowsVersion: opt text;
  };
 type AssetCategory = 
  variant {
@@ -162,6 +195,7 @@ type Asset =
    storage: opt text;
    vendorName: opt text;
    warrantyDate: opt text;
+   windowsVersion: opt text;
  };
 service : {
   _caffeineStorageBlobIsLive: (hash: blob) -> (bool) query;
@@ -176,6 +210,9 @@ service : {
   addAsset: (input: AssetInput) -> (nat);
   addAssetWithCreds: (adminUsername: text, adminPassword: text, input:
    AssetInput) -> (nat);
+  addHistoryEntry: (entry: HistoryEntryInput) -> (nat);
+  addHistoryEntryWithCreds: (adminUsername: text, adminPassword: text, entry:
+   HistoryEntryInput) -> (nat);
   addLocalUser: (input: LocalUserInput) -> (nat);
   addLocalUserWithCreds: (adminUsername: text, adminPassword: text, input:
    LocalUserInput) -> (nat);
@@ -184,6 +221,10 @@ service : {
    StoreSoftwareInput) -> (nat);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   assignRole: (user: Principal, role: UserRole) -> ();
+  batchAddAssets: (inputs: vec AssetInput) -> (vec nat);
+  batchAddHistory: (entries: vec HistoryEntryInput) -> (vec nat);
+  batchAddSoftware: (inputs: vec StoreSoftwareInput) -> (vec nat);
+  batchAddUsers: (inputs: vec LocalUserInput) -> (vec nat);
   bootstrapAdmin: () -> (bool);
   createFirstLocalUser: (input: LocalUserInput) ->
    (variant {
@@ -209,12 +250,17 @@ service : {
   getAssetsByStatus: (status: AssetStatus) -> (vec Asset) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
+  getFlexHistory: () -> (vec FlexHistoryEntry) query;
+  getFlexHistoryForAsset: (assetId: nat) -> (vec FlexHistoryEntry) query;
   getHistory: () -> (vec AssignmentHistoryEntry) query;
   getHistoryForAsset: (assetId: nat) -> (vec AssignmentHistoryEntry) query;
+  getMigrationStats: () -> (MigrationStats) query;
   getStats: () -> (Stats) query;
+  getUserByUsername: (username: text) -> (opt LocalUser) query;
   getUserProfile: (user: Principal) -> (opt UserProfile) query;
   getWarrantyStats: () -> (WarrantyStats) query;
   hasLocalUsers: () -> (bool) query;
+  hasMigratedFromLocalStorage: () -> (bool) query;
   isAdminWithCreds: (adminUsername: text, adminPassword: text) ->
    (bool) query;
   isCallerAdmin: () -> (bool) query;
@@ -224,6 +270,7 @@ service : {
           id: nat;
           name: text;
         }) query;
+  markMigrationComplete: () -> ();
   saveCallerUserProfile: (profile: UserProfile) -> ();
   searchAssets: (term: text) -> (vec Asset) query;
   selfRegisterLocalUser: (username: text, password: text, name: text,

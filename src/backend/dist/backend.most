@@ -7,6 +7,19 @@ type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
 type ExternalBlob__571321724 = Blob;
+type FlexHistoryEntry__922262061 =
+  {
+    action : Text;
+    assetId : Nat;
+    assetName : Text;
+    assetType : Text;
+    changedBy : Text;
+    id : Nat;
+    newAssignee : ?Text;
+    notes : ?Text;
+    previousAssignee : ?Text;
+    timestamp : Int
+  };
 type Int__270357528 = Int__616954475;
 type Int__616954475 = Int;
 type Internal__667636161<T> =
@@ -98,9 +111,16 @@ actor {
     {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
   stable assetVendorNames :
     {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
+  stable assetWindowsVersions :
+    {var root : Node__46230540<Nat, Text>; var size : Nat__490723111};
   stable assets :
     {
       var root : Node__46230540<Nat, StoreAsset__440815324>;
+      var size : Nat__490723111
+    };
+  stable flexHistory :
+    {
+      var root : Node__46230540<Nat, FlexHistoryEntry__922262061>;
       var size : Nat__490723111
     };
   stable history :
@@ -121,6 +141,7 @@ actor {
       var size : Nat__490723111
     };
   stable var nextAssetId : Nat;
+  stable var nextFlexHistoryId : Nat;
   stable var nextHistoryId : Nat;
   stable var nextLocalUserId : Nat;
   stable var nextSoftwareId : Nat;
@@ -140,13 +161,17 @@ actor {
   stable var stableAssetInvoiceNumbers : [(Nat, Text)];
   stable var stableAssetTags : [(Nat, Text)];
   stable var stableAssetVendorNames : [(Nat, Text)];
+  stable var stableAssetWindowsVersions : [(Nat, Text)];
   stable var stableAssets : [(Nat, StoreAsset__440815324)];
   stable var stableDataSaved : Bool;
+  stable var stableFlexHistory : [(Nat, FlexHistoryEntry__922262061)];
   stable var stableHistory : [(Nat, StoreAssignmentHistoryEntry__192109380)];
   stable var stableLocalUserCredentials :
     [(Nat, StoreLocalUserCredentials__959845887)];
   stable var stableLocalUsers : [(Nat, StoreLocalUser__732209660)];
+  stable var stableMigrationDone : Bool;
   stable var stableNextAssetId : Nat;
+  stable var stableNextFlexHistoryId : Nat;
   stable var stableNextHistoryId : Nat;
   stable var stableNextLocalUserId : Nat;
   stable var stableNextSoftwareId : Nat;

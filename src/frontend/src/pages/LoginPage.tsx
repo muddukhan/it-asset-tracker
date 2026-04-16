@@ -4,8 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, Lock, User } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
-import type { LocalSession } from "../App";
-import { localDB } from "../utils/localDB";
+import type { LocalSession } from "../context/LocalSessionContext";
+import { persistSession } from "../context/LocalSessionContext";
+import { getActor } from "../hooks/useActor";
+import { runMigrationIfNeeded } from "../utils/localDB";
 
 export function LoginPage({
   onLocalLogin,
@@ -26,101 +28,78 @@ export function LoginPage({
 
     const usernameClean = username.trim();
 
-    // 1. Check localDB first (covers users created via Admin panel and previously-synced JSON users)
-    const localUser = localDB.findByCredentials(usernameClean, password);
-    if (localUser) {
-      const session: LocalSession = {
-        name: localUser.name,
-        accessLevel: localUser.accessLevel,
-        username: localUser.username,
-        password: password,
-      };
-      localStorage.setItem("localUserSession", JSON.stringify(session));
-      onLocalLogin(session);
-      return;
-    }
-
-    // 2. JSON fallback — used on first login for users defined in users.json
     try {
-      const res = await fetch("/users.json");
-      if (res.ok) {
-        const data = (await res.json()) as {
-          users: Array<{
-            userId: string;
-            password: string;
-            name: string;
-            accessLevel: string;
-          }>;
+      const actor = await getActor();
+
+      // First check: try backend login (canonical source after migration)
+      const backendResult = await actor.loginLocalUser(usernameClean, password);
+      if (backendResult) {
+        const session: LocalSession = {
+          name: backendResult.name,
+          accessLevel: backendResult.accessLevel,
+          username: usernameClean,
+          password: password, // in-memory only
         };
-        const match = data.users.find(
-          (u) => u.userId === usernameClean && u.password === password,
-        );
-        if (match) {
-          // Persist to localDB so future logins use localDB directly
-          localDB.upsertUserByUsername({
-            name: match.name,
-            username: match.userId,
-            password: match.password,
-            accessLevel: match.accessLevel,
-            employeeCode: "",
-            department: "",
-            email: "",
-          });
-          const session: LocalSession = {
-            name: match.name,
-            accessLevel: match.accessLevel,
-            username: match.userId,
-            password: password,
-          };
-          localStorage.setItem("localUserSession", JSON.stringify(session));
-          onLocalLogin(session);
-          return;
-        }
-      }
-    } catch {
-      // JSON fetch failed — continue to error
-    }
+        persistSession(session);
 
-    // 3. Check localStorage JSON registry (users added via Admin panel that were synced to registry)
-    try {
-      const stored = localStorage.getItem("brandscapes_users_json_registry");
-      if (stored) {
-        const registry = JSON.parse(stored) as Array<{
-          userId: string;
-          password: string;
-          name: string;
-          accessLevel: string;
-        }>;
-        const match = registry.find(
-          (u) => u.userId === usernameClean && u.password === password,
-        );
-        if (match) {
-          localDB.upsertUserByUsername({
-            name: match.name,
-            username: match.userId,
-            password: match.password,
-            accessLevel: match.accessLevel,
-            employeeCode: "",
-            department: "",
-            email: "",
-          });
-          const session: LocalSession = {
-            name: match.name,
-            accessLevel: match.accessLevel,
-            username: match.userId,
-            password: password,
-          };
-          localStorage.setItem("localUserSession", JSON.stringify(session));
-          onLocalLogin(session);
-          return;
-        }
-      }
-    } catch {
-      // Registry read failed — continue to error
-    }
+        // Run migration after first successful login (idempotent)
+        runMigrationIfNeeded(actor).catch(() => {});
 
-    setLocalError("Invalid username or password");
-    setLocalLoading(false);
+        onLocalLogin(session);
+        return;
+      }
+
+      // Fallback: check users.json (covers first-ever login before any backend users)
+      try {
+        const res = await fetch("/users.json");
+        if (res.ok) {
+          const data = (await res.json()) as {
+            users: Array<{
+              userId: string;
+              password: string;
+              name: string;
+              accessLevel: string;
+            }>;
+          };
+          const match = data.users.find(
+            (u) => u.userId === usernameClean && u.password === password,
+          );
+          if (match) {
+            // Sync to backend so future logins go through canister
+            try {
+              await actor.selfRegisterLocalUser(
+                match.userId,
+                match.password,
+                match.name,
+                match.accessLevel,
+              );
+            } catch {
+              // Non-fatal — user may already exist
+            }
+
+            const session: LocalSession = {
+              name: match.name,
+              accessLevel: match.accessLevel,
+              username: match.userId,
+              password: password,
+            };
+            persistSession(session);
+            runMigrationIfNeeded(actor).catch(() => {});
+            onLocalLogin(session);
+            return;
+          }
+        }
+      } catch {
+        // JSON fetch failed — continue to error
+      }
+
+      setLocalError("Invalid username or password");
+    } catch (err) {
+      console.error("Login error:", err);
+      setLocalError("Login failed — please try again");
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   return (
@@ -203,7 +182,7 @@ export function LoginPage({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLocalLogin()}
-                  data-ocid="login.input"
+                  data-ocid="login.password_input"
                 />
                 <button
                   type="button"

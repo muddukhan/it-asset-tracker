@@ -41,6 +41,7 @@ export const AssetInput = IDL.Record({
   'ram' : IDL.Opt(IDL.Text),
   'status' : AssetStatus,
   'employeeCode' : IDL.Opt(IDL.Text),
+  'windowsVersion' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
@@ -55,6 +56,17 @@ export const AssetInput = IDL.Record({
   'location' : IDL.Text,
   'vendorName' : IDL.Opt(IDL.Text),
   'photoId' : IDL.Opt(ExternalBlob),
+});
+export const HistoryEntryInput = IDL.Record({
+  'action' : IDL.Text,
+  'changedBy' : IDL.Text,
+  'newAssignee' : IDL.Opt(IDL.Text),
+  'assetId' : IDL.Nat,
+  'notes' : IDL.Opt(IDL.Text),
+  'timestamp' : IDL.Int,
+  'assetName' : IDL.Text,
+  'assetType' : IDL.Text,
+  'previousAssignee' : IDL.Opt(IDL.Text),
 });
 export const LocalUserInput = IDL.Record({
   'accessLevel' : IDL.Text,
@@ -91,6 +103,7 @@ export const Asset = IDL.Record({
   'ram' : IDL.Opt(IDL.Text),
   'status' : AssetStatus,
   'employeeCode' : IDL.Opt(IDL.Text),
+  'windowsVersion' : IDL.Opt(IDL.Text),
   'purchaseDate' : IDL.Opt(IDL.Text),
   'storage' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
@@ -136,6 +149,18 @@ export const UserWithRole = IDL.Record({
   'role' : UserRole,
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const FlexHistoryEntry = IDL.Record({
+  'id' : IDL.Nat,
+  'action' : IDL.Text,
+  'changedBy' : IDL.Text,
+  'newAssignee' : IDL.Opt(IDL.Text),
+  'assetId' : IDL.Nat,
+  'notes' : IDL.Opt(IDL.Text),
+  'timestamp' : IDL.Int,
+  'assetName' : IDL.Text,
+  'assetType' : IDL.Text,
+  'previousAssignee' : IDL.Opt(IDL.Text),
+});
 export const AssignmentHistoryEntry = IDL.Record({
   'id' : IDL.Nat,
   'changedBy' : Principal,
@@ -146,6 +171,12 @@ export const AssignmentHistoryEntry = IDL.Record({
   'timestamp' : Time,
   'assetName' : IDL.Text,
   'fromAssignee' : IDL.Opt(IDL.Text),
+});
+export const MigrationStats = IDL.Record({
+  'historyCount' : IDL.Nat,
+  'softwareCount' : IDL.Nat,
+  'userCount' : IDL.Nat,
+  'assetCount' : IDL.Nat,
 });
 export const Stats = IDL.Record({
   'assigned' : IDL.Nat,
@@ -194,6 +225,12 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'addHistoryEntry' : IDL.Func([HistoryEntryInput], [IDL.Nat], []),
+  'addHistoryEntryWithCreds' : IDL.Func(
+      [IDL.Text, IDL.Text, HistoryEntryInput],
+      [IDL.Nat],
+      [],
+    ),
   'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
   'addLocalUserWithCreds' : IDL.Func(
       [IDL.Text, IDL.Text, LocalUserInput],
@@ -208,6 +245,18 @@ export const idlService = IDL.Service({
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'assignRole' : IDL.Func([Principal, UserRole], [], []),
+  'batchAddAssets' : IDL.Func([IDL.Vec(AssetInput)], [IDL.Vec(IDL.Nat)], []),
+  'batchAddHistory' : IDL.Func(
+      [IDL.Vec(HistoryEntryInput)],
+      [IDL.Vec(IDL.Nat)],
+      [],
+    ),
+  'batchAddSoftware' : IDL.Func(
+      [IDL.Vec(StoreSoftwareInput)],
+      [IDL.Vec(IDL.Nat)],
+      [],
+    ),
+  'batchAddUsers' : IDL.Func([IDL.Vec(LocalUserInput)], [IDL.Vec(IDL.Nat)], []),
   'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
   'createFirstLocalUser' : IDL.Func(
       [LocalUserInput],
@@ -234,16 +283,25 @@ export const idlService = IDL.Service({
   'getAssetsByStatus' : IDL.Func([AssetStatus], [IDL.Vec(Asset)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getFlexHistory' : IDL.Func([], [IDL.Vec(FlexHistoryEntry)], ['query']),
+  'getFlexHistoryForAsset' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(FlexHistoryEntry)],
+      ['query'],
+    ),
   'getHistory' : IDL.Func([], [IDL.Vec(AssignmentHistoryEntry)], ['query']),
   'getHistoryForAsset' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(AssignmentHistoryEntry)],
       ['query'],
     ),
+  'getMigrationStats' : IDL.Func([], [MigrationStats], ['query']),
   'getStats' : IDL.Func([], [Stats], ['query']),
+  'getUserByUsername' : IDL.Func([IDL.Text], [IDL.Opt(LocalUser)], ['query']),
   'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
   'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
   'hasLocalUsers' : IDL.Func([], [IDL.Bool], ['query']),
+  'hasMigratedFromLocalStorage' : IDL.Func([], [IDL.Bool], ['query']),
   'isAdminWithCreds' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'loginLocalUser' : IDL.Func(
@@ -259,6 +317,7 @@ export const idlService = IDL.Service({
       ],
       ['query'],
     ),
+  'markMigrationComplete' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
   'selfRegisterLocalUser' : IDL.Func(
@@ -322,6 +381,7 @@ export const idlFactory = ({ IDL }) => {
     'ram' : IDL.Opt(IDL.Text),
     'status' : AssetStatus,
     'employeeCode' : IDL.Opt(IDL.Text),
+    'windowsVersion' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
@@ -336,6 +396,17 @@ export const idlFactory = ({ IDL }) => {
     'location' : IDL.Text,
     'vendorName' : IDL.Opt(IDL.Text),
     'photoId' : IDL.Opt(ExternalBlob),
+  });
+  const HistoryEntryInput = IDL.Record({
+    'action' : IDL.Text,
+    'changedBy' : IDL.Text,
+    'newAssignee' : IDL.Opt(IDL.Text),
+    'assetId' : IDL.Nat,
+    'notes' : IDL.Opt(IDL.Text),
+    'timestamp' : IDL.Int,
+    'assetName' : IDL.Text,
+    'assetType' : IDL.Text,
+    'previousAssignee' : IDL.Opt(IDL.Text),
   });
   const LocalUserInput = IDL.Record({
     'accessLevel' : IDL.Text,
@@ -372,6 +443,7 @@ export const idlFactory = ({ IDL }) => {
     'ram' : IDL.Opt(IDL.Text),
     'status' : AssetStatus,
     'employeeCode' : IDL.Opt(IDL.Text),
+    'windowsVersion' : IDL.Opt(IDL.Text),
     'purchaseDate' : IDL.Opt(IDL.Text),
     'storage' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
@@ -417,6 +489,18 @@ export const idlFactory = ({ IDL }) => {
     'role' : UserRole,
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const FlexHistoryEntry = IDL.Record({
+    'id' : IDL.Nat,
+    'action' : IDL.Text,
+    'changedBy' : IDL.Text,
+    'newAssignee' : IDL.Opt(IDL.Text),
+    'assetId' : IDL.Nat,
+    'notes' : IDL.Opt(IDL.Text),
+    'timestamp' : IDL.Int,
+    'assetName' : IDL.Text,
+    'assetType' : IDL.Text,
+    'previousAssignee' : IDL.Opt(IDL.Text),
+  });
   const AssignmentHistoryEntry = IDL.Record({
     'id' : IDL.Nat,
     'changedBy' : Principal,
@@ -427,6 +511,12 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Time,
     'assetName' : IDL.Text,
     'fromAssignee' : IDL.Opt(IDL.Text),
+  });
+  const MigrationStats = IDL.Record({
+    'historyCount' : IDL.Nat,
+    'softwareCount' : IDL.Nat,
+    'userCount' : IDL.Nat,
+    'assetCount' : IDL.Nat,
   });
   const Stats = IDL.Record({
     'assigned' : IDL.Nat,
@@ -475,6 +565,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'addHistoryEntry' : IDL.Func([HistoryEntryInput], [IDL.Nat], []),
+    'addHistoryEntryWithCreds' : IDL.Func(
+        [IDL.Text, IDL.Text, HistoryEntryInput],
+        [IDL.Nat],
+        [],
+      ),
     'addLocalUser' : IDL.Func([LocalUserInput], [IDL.Nat], []),
     'addLocalUserWithCreds' : IDL.Func(
         [IDL.Text, IDL.Text, LocalUserInput],
@@ -489,6 +585,22 @@ export const idlFactory = ({ IDL }) => {
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'assignRole' : IDL.Func([Principal, UserRole], [], []),
+    'batchAddAssets' : IDL.Func([IDL.Vec(AssetInput)], [IDL.Vec(IDL.Nat)], []),
+    'batchAddHistory' : IDL.Func(
+        [IDL.Vec(HistoryEntryInput)],
+        [IDL.Vec(IDL.Nat)],
+        [],
+      ),
+    'batchAddSoftware' : IDL.Func(
+        [IDL.Vec(StoreSoftwareInput)],
+        [IDL.Vec(IDL.Nat)],
+        [],
+      ),
+    'batchAddUsers' : IDL.Func(
+        [IDL.Vec(LocalUserInput)],
+        [IDL.Vec(IDL.Nat)],
+        [],
+      ),
     'bootstrapAdmin' : IDL.Func([], [IDL.Bool], []),
     'createFirstLocalUser' : IDL.Func(
         [LocalUserInput],
@@ -519,16 +631,25 @@ export const idlFactory = ({ IDL }) => {
     'getAssetsByStatus' : IDL.Func([AssetStatus], [IDL.Vec(Asset)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getFlexHistory' : IDL.Func([], [IDL.Vec(FlexHistoryEntry)], ['query']),
+    'getFlexHistoryForAsset' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(FlexHistoryEntry)],
+        ['query'],
+      ),
     'getHistory' : IDL.Func([], [IDL.Vec(AssignmentHistoryEntry)], ['query']),
     'getHistoryForAsset' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(AssignmentHistoryEntry)],
         ['query'],
       ),
+    'getMigrationStats' : IDL.Func([], [MigrationStats], ['query']),
     'getStats' : IDL.Func([], [Stats], ['query']),
+    'getUserByUsername' : IDL.Func([IDL.Text], [IDL.Opt(LocalUser)], ['query']),
     'getUserProfile' : IDL.Func([Principal], [IDL.Opt(UserProfile)], ['query']),
     'getWarrantyStats' : IDL.Func([], [WarrantyStats], ['query']),
     'hasLocalUsers' : IDL.Func([], [IDL.Bool], ['query']),
+    'hasMigratedFromLocalStorage' : IDL.Func([], [IDL.Bool], ['query']),
     'isAdminWithCreds' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'loginLocalUser' : IDL.Func(
@@ -544,6 +665,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'markMigrationComplete' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchAssets' : IDL.Func([IDL.Text], [IDL.Vec(Asset)], ['query']),
     'selfRegisterLocalUser' : IDL.Func(
