@@ -104,15 +104,16 @@ function AppShell() {
   const [previousPage, setPreviousPage] = useState<NavPage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // On app startup: if credentials sync is pending, retry in the background.
-  // We snapshot session values into local vars so the effect has no reactive deps.
+  // On app startup: always silently re-sync credentials to the backend.
+  // This ensures that after a canister redeployment (which wipes backend state),
+  // the user's credentials are re-registered before any mutation is attempted.
+  // Fire-and-forget is intentional here — we don't block app startup on this.
   const _startupUsername = localSession?.username ?? "";
   const _startupPassword = localSession?.password ?? "";
   const _startupName = localSession?.name ?? "";
   const _startupAccessLevel = localSession?.accessLevel ?? "";
   useEffect(() => {
-    const pending = localStorage.getItem("pendingBackendSync");
-    if (pending && _startupUsername && _startupPassword) {
+    if (_startupUsername && _startupPassword) {
       getActor()
         .then((actor) =>
           syncCredentialsToBackend(actor, {
@@ -127,6 +128,7 @@ function AppShell() {
         })
         .catch(() => {});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_startupUsername, _startupPassword, _startupName, _startupAccessLevel]);
 
   const handleLocalLogout = () => {

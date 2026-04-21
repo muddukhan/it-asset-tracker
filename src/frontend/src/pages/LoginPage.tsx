@@ -18,6 +18,23 @@ interface JsonUser {
   accessLevel: string;
 }
 
+interface RegistryUser {
+  userId: string;
+  password: string;
+  name: string;
+  accessLevel: string;
+}
+
+function getLocalUserRegistry(): RegistryUser[] {
+  try {
+    const raw = localStorage.getItem("localUserRegistry");
+    if (!raw) return [];
+    return JSON.parse(raw) as RegistryUser[];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Fetch users.json and find a matching user.
  * Returns null if the fetch fails or no match is found.
@@ -40,6 +57,31 @@ async function findUserInJson(
   }
 }
 
+/**
+ * Try to login via the backend canister.
+ * Returns null if the canister is unreachable, empty, or rejects the credentials.
+ * NEVER throws — all errors are swallowed and treated as "not found".
+ */
+async function tryBackendLogin(
+  username: string,
+  password: string,
+): Promise<{ name: string; accessLevel: string; username: string } | null> {
+  try {
+    const actor = await getActor();
+    if (!actor) return null;
+    const result = await actor.loginLocalUser(username, password);
+    if (!result) return null;
+    return { name: result.name, accessLevel: result.accessLevel, username };
+  } catch (err) {
+    // Canister unreachable or threw — fall through to users.json
+    console.warn(
+      "[LoginPage] Backend loginLocalUser failed (will try fallback):",
+      err,
+    );
+    return null;
+  }
+}
+
 export function LoginPage({
   onLocalLogin,
 }: { onLocalLogin: (session: LocalSession) => void }) {
@@ -50,103 +92,123 @@ export function LoginPage({
   const [localLoading, setLocalLoading] = useState(false);
 
   const handleLocalLogin = async () => {
-    if (!username.trim() || !password.trim()) {
+    const usernameClean = username.trim();
+    const passwordClean = password.trim();
+
+    if (!usernameClean || !passwordClean) {
       setLocalError("Please enter both username and password");
       return;
     }
     setLocalError("");
     setLocalLoading(true);
 
-    const usernameClean = username.trim();
-
     try {
-      const actor = await getActor();
-
-      // ── Path A: Backend has the user (normal case after first login) ──────────
-      const backendResult = await actor.loginLocalUser(usernameClean, password);
-      if (backendResult) {
+      // ── Step 1: Try backend directly (normal case after first login) ──────────
+      const backendUser = await tryBackendLogin(usernameClean, passwordClean);
+      if (backendUser) {
+        console.log("[LoginPage] Authenticated via backend canister");
         const session: LocalSession = {
-          name: backendResult.name,
-          accessLevel: backendResult.accessLevel,
+          name: backendUser.name,
+          accessLevel: backendUser.accessLevel,
           username: usernameClean,
-          password,
+          password: passwordClean,
         };
-        // Persist session INCLUDING password to localStorage
         persistSession(session);
-        // Clear any pending sync flag since we confirmed backend has the user
         localStorage.removeItem("pendingBackendSync");
-        runMigrationIfNeeded(actor).catch(() => {});
+        // Background migration — don't block login
+        getActor()
+          .then((actor) => runMigrationIfNeeded(actor))
+          .catch(() => {});
         onLocalLogin(session);
         return;
       }
 
-      // ── Path B: Backend empty (fresh deploy) — fall back to users.json ────────
-      const jsonUser = await findUserInJson(usernameClean, password);
-      if (!jsonUser) {
-        // Also check localStorage registry (users added via Admin panel)
+      // ── Step 2: Fallback — check users.json ───────────────────────────────────
+      console.log("[LoginPage] Backend returned null — checking users.json");
+      const jsonUser = await findUserInJson(usernameClean, passwordClean);
+
+      // ── Step 3: Fallback — check localStorage registry ────────────────────────
+      let foundUser: {
+        userId: string;
+        name: string;
+        accessLevel: string;
+        password: string;
+      } | null = null;
+      if (jsonUser) {
+        foundUser = jsonUser;
+        console.log("[LoginPage] Found user in users.json:", jsonUser.userId);
+      } else {
         const registry = getLocalUserRegistry();
         const registryUser = registry.find(
-          (u) => u.userId === usernameClean && u.password === password,
+          (u) => u.userId === usernameClean && u.password === passwordClean,
         );
-        if (!registryUser) {
-          setLocalError("Invalid username or password");
-          return;
+        if (registryUser) {
+          foundUser = registryUser;
+          console.log(
+            "[LoginPage] Found user in localStorage registry:",
+            registryUser.userId,
+          );
         }
-        // Found in registry — sync to backend and create session
-        const synced = await syncCredentialsToBackend(actor, {
-          username: registryUser.userId,
-          password,
-          name: registryUser.name,
-          accessLevel: registryUser.accessLevel,
-        });
-        if (!synced) {
-          localStorage.setItem("pendingBackendSync", "1");
-        } else {
-          localStorage.removeItem("pendingBackendSync");
-        }
-        const regSession: LocalSession = {
-          name: registryUser.name,
-          accessLevel: registryUser.accessLevel,
-          username: registryUser.userId,
-          password,
-        };
-        persistSession(regSession);
-        runMigrationIfNeeded(actor).catch(() => {});
-        onLocalLogin(regSession);
+      }
+
+      if (!foundUser) {
+        console.log(
+          "[LoginPage] User not found in backend, users.json, or registry",
+        );
+        setLocalError("Invalid username or password");
         return;
       }
 
-      // Found in users.json — AWAIT sync fully before creating session
-      const synced = await syncCredentialsToBackend(actor, {
-        username: jsonUser.userId,
-        password,
-        name: jsonUser.name,
-        accessLevel: jsonUser.accessLevel,
-      });
+      // ── Step 4: Sync credentials to backend (AWAITED) ─────────────────────────
+      // We always attempt sync. If it returns false (conflicting password in stale
+      // canister), we still allow login since we validated against users.json/registry.
+      let syncOk = false;
+      try {
+        const actor = await getActor();
+        syncOk = await syncCredentialsToBackend(actor, {
+          username: foundUser.userId,
+          password: passwordClean,
+          name: foundUser.name,
+          accessLevel: foundUser.accessLevel,
+        });
+        console.log("[LoginPage] syncCredentialsToBackend result:", syncOk);
+      } catch (syncErr) {
+        console.warn(
+          "[LoginPage] syncCredentialsToBackend threw (will set pending flag):",
+          syncErr,
+        );
+        syncOk = false;
+      }
 
-      if (!synced) {
-        // Sync failed all retries — still allow login but flag pending sync
-        console.error(
-          "LoginPage: Could not sync user to backend after 3 attempts. " +
-            "Add/edit operations may fail. Flag set: pendingBackendSync",
+      if (!syncOk) {
+        // Could not register in backend (network error or conflicting entry).
+        // Still allow login — flag for retry on next startup.
+        console.warn(
+          "[LoginPage] Sync failed — setting pendingBackendSync flag",
         );
         localStorage.setItem("pendingBackendSync", "1");
       } else {
         localStorage.removeItem("pendingBackendSync");
       }
 
-      // Create the session from users.json data — password persisted to localStorage
+      // ── Step 5: Create session (AFTER sync attempt) ───────────────────────────
       const session: LocalSession = {
-        name: jsonUser.name,
-        accessLevel: jsonUser.accessLevel,
-        username: jsonUser.userId,
-        password,
+        name: foundUser.name,
+        accessLevel: foundUser.accessLevel,
+        username: foundUser.userId,
+        password: passwordClean,
       };
       persistSession(session);
-      runMigrationIfNeeded(actor).catch(() => {});
+
+      // Background migration — don't block login
+      getActor()
+        .then((actor) => runMigrationIfNeeded(actor))
+        .catch(() => {});
+
       onLocalLogin(session);
     } catch (err) {
-      console.error("Login error:", err);
+      // This outer catch only fires if something truly unexpected went wrong
+      console.error("[LoginPage] Unexpected login error:", err);
       setLocalError("Login failed — please try again");
     } finally {
       setLocalLoading(false);
@@ -294,23 +356,4 @@ export function LoginPage({
       </motion.div>
     </div>
   );
-}
-
-// ── Local User Registry helpers ───────────────────────────────────────────────
-
-interface RegistryUser {
-  userId: string;
-  password: string;
-  name: string;
-  accessLevel: string;
-}
-
-function getLocalUserRegistry(): RegistryUser[] {
-  try {
-    const raw = localStorage.getItem("localUserRegistry");
-    if (!raw) return [];
-    return JSON.parse(raw) as RegistryUser[];
-  } catch {
-    return [];
-  }
 }

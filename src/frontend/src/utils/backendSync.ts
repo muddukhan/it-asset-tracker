@@ -7,8 +7,9 @@
  *
  * Key design:
  *  - Calls selfRegisterLocalUser (4-param backend function) with retries
- *  - Returns true on success, false on all-retries failure
- *  - Safe to call repeatedly: backend returns true if already registered
+ *  - Returns true on success or already-registered-same-password
+ *  - Returns false ONLY on username conflict (different password) — NOT retryable
+ *  - Network errors are retried up to maxAttempts times
  */
 
 import type { Backend } from "../backend";
@@ -22,39 +23,59 @@ export interface SyncCredentials {
 
 /**
  * Sync credentials to the backend canister with up to maxAttempts retries.
- * Returns true if credentials are confirmed registered, false otherwise.
+ * Returns true if credentials are confirmed registered.
+ * Returns false if username is taken with a DIFFERENT password (conflict — stop, not retryable).
+ * Returns false if all retry attempts were exhausted due to network errors.
  */
 export async function syncCredentialsToBackend(
   actor: Backend,
   creds: SyncCredentials,
   maxAttempts = 3,
 ): Promise<boolean> {
-  if (!creds.username || !creds.password) return false;
+  if (!creds.username || !creds.password) {
+    console.warn("[backendSync] Missing username or password — skipping sync");
+    return false;
+  }
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let result: boolean | undefined;
     try {
-      const ok = await actor.selfRegisterLocalUser(
+      result = await actor.selfRegisterLocalUser(
         creds.username,
         creds.password,
         creds.name || creds.username,
         creds.accessLevel || "readonly",
       );
-      if (ok) return true;
-      // ok === false means username taken with different password — no retry needed
-      console.warn(
-        "syncCredentialsToBackend: username already registered with a different password",
+      console.log(
+        `[backendSync] attempt ${attempt}/${maxAttempts}: username=${creds.username}, result=${result}`,
       );
-      return false;
     } catch (err) {
+      // Network/canister error — retry
       console.warn(
-        `syncCredentialsToBackend attempt ${attempt + 1}/${maxAttempts} failed:`,
+        `[backendSync] attempt ${attempt}/${maxAttempts}: username=${creds.username}, threw:`,
         err,
       );
-      if (attempt < maxAttempts - 1) {
+      if (attempt < maxAttempts) {
         // Exponential back-off: 400ms, 800ms
-        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+        continue;
       }
+      // All attempts exhausted
+      return false;
     }
+
+    if (result === true) {
+      // Successfully registered (or already registered with same password)
+      return true;
+    }
+
+    // result === false: username taken with different password — NOT retryable
+    console.warn(
+      "[backendSync] Username already registered with a different password — conflict, not retrying",
+      creds.username,
+    );
+    return false;
   }
+
   return false;
 }
