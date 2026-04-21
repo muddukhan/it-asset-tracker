@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { StoreSoftware, StoreSoftwareInput } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
+import { syncCredentialsToBackend } from "../utils/backendSync";
 import type { LocalSoftware, LocalSoftwareInput } from "../utils/localDB";
 import { useActor } from "./useActor";
 
@@ -40,6 +41,30 @@ function toBackendSoftwareInput(input: LocalSoftwareInput): StoreSoftwareInput {
   };
 }
 
+/** Check if an error from the backend is an auth/unauthorized failure */
+function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Unauthorized") ||
+    msg.includes("unauthorized") ||
+    msg.includes("trap") ||
+    msg.includes("Invalid credentials") ||
+    msg.includes("not authenticated")
+  );
+}
+
+/** Wrap a backend call and convert auth errors to a friendly message */
+async function withAuthErrorHandling<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isAuthError(err)) {
+      throw new Error("Session expired. Please log out and log back in.");
+    }
+    throw err;
+  }
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export function useGetAllSoftware() {
@@ -68,12 +93,30 @@ export function useAddSoftware() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before mutation to handle fresh deploys
+      const synced = await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+      if (!synced) {
+        throw new Error(
+          "Failed to sync credentials. Please log out and log back in.",
+        );
+      }
+
       const backendInput = toBackendSoftwareInput(input);
-      await actor.addSoftwareWithCreds(
-        creds.username,
-        creds.password,
-        backendInput,
+      await withAuthErrorHandling(() =>
+        actor.addSoftwareWithCreds(
+          creds.username,
+          creds.password,
+          backendInput,
+        ),
       );
     },
     onSuccess: () => {
@@ -95,13 +138,26 @@ export function useUpdateSoftware() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+
       const backendInput = toBackendSoftwareInput(input);
-      await actor.updateSoftwareWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
-        backendInput,
+      await withAuthErrorHandling(() =>
+        actor.updateSoftwareWithCreds(
+          creds.username,
+          creds.password,
+          BigInt(id),
+          backendInput,
+        ),
       );
 
       // Record history entry for software transfer tracking
@@ -136,11 +192,24 @@ export function useDeleteSoftware() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
-      await actor.deleteSoftwareWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+
+      await withAuthErrorHandling(() =>
+        actor.deleteSoftwareWithCreds(
+          creds.username,
+          creds.password,
+          BigInt(id),
+        ),
       );
     },
     onSuccess: () => {

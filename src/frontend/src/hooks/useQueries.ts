@@ -8,6 +8,7 @@ import type {
   LocalUserInput,
 } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
+import { syncCredentialsToBackend } from "../utils/backendSync";
 import type {
   LocalAsset,
   LocalAssetInput,
@@ -182,6 +183,32 @@ function toFrontendUser(u: LocalUser): LocalDBUser {
   };
 }
 
+// ── Auth check helpers ────────────────────────────────────────────────────────
+
+/** Check if an error from the backend is an auth/unauthorized failure */
+function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Unauthorized") ||
+    msg.includes("unauthorized") ||
+    msg.includes("trap") ||
+    msg.includes("Invalid credentials") ||
+    msg.includes("not authenticated")
+  );
+}
+
+/** Wrap a backend call and convert auth errors to a friendly message */
+async function withAuthErrorHandling<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isAuthError(err)) {
+      throw new Error("Session expired. Please log out and log back in.");
+    }
+    throw err;
+  }
+}
+
 // ── Asset queries ─────────────────────────────────────────────────────────────
 
 export function useGetAllAssets() {
@@ -333,7 +360,22 @@ export function useAddAsset() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before every mutation to handle fresh deploys
+      const synced = await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+      if (!synced) {
+        throw new Error(
+          "Failed to sync credentials. Please log out and log back in.",
+        );
+      }
 
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
@@ -341,10 +383,8 @@ export function useAddAsset() {
       }
       const { photoFile: _photoFile, photoDataUrl: _pd, ...rest } = input;
       const backendInput = toBackendAssetInput({ ...rest, photoDataUrl });
-      await actor.addAssetWithCreds(
-        creds.username,
-        creds.password,
-        backendInput,
+      await withAuthErrorHandling(() =>
+        actor.addAssetWithCreds(creds.username, creds.password, backendInput),
       );
     },
     onSuccess: () => {
@@ -371,7 +411,17 @@ export function useUpdateAsset() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
 
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
@@ -388,11 +438,13 @@ export function useUpdateAsset() {
         photoDataUrl,
       };
       const backendInput = toBackendAssetInput(merged);
-      await actor.updateAssetWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
-        backendInput,
+      await withAuthErrorHandling(() =>
+        actor.updateAssetWithCreds(
+          creds.username,
+          creds.password,
+          BigInt(id),
+          backendInput,
+        ),
       );
 
       // Record history entry for assignment tracking
@@ -428,11 +480,20 @@ export function useDeleteAsset() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
-      await actor.deleteAssetWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync credentials before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+
+      await withAuthErrorHandling(() =>
+        actor.deleteAssetWithCreds(creds.username, creds.password, BigInt(id)),
       );
     },
     onSuccess: () => {
@@ -468,7 +529,23 @@ export function useAddLocalUser() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // CRITICAL: Re-sync admin credentials to backend before adding a user.
+      // This handles fresh deploys where backend has been wiped.
+      const synced = await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+      if (!synced) {
+        throw new Error(
+          "Failed to sync admin credentials. Please log out and log in again.",
+        );
+      }
 
       const userInput: LocalUserInput = {
         username: input.username,
@@ -480,11 +557,30 @@ export function useAddLocalUser() {
         email: input.email || "",
         notes: input.notes,
       };
-      await actor.addLocalUserWithCreds(
-        creds.username,
-        creds.password,
-        userInput,
+      await withAuthErrorHandling(() =>
+        actor.addLocalUserWithCreds(creds.username, creds.password, userInput),
       );
+
+      // Also sync the new user's credentials so they can log in
+      // and use WithCreds operations themselves
+      if (input.password) {
+        await syncCredentialsToBackend(actor, {
+          username: input.username,
+          password: input.password,
+          name: input.name,
+          accessLevel: input.accessLevel,
+        }).catch(() => {
+          // Non-fatal — user can still log in via registry
+        });
+      }
+
+      // Save new user to localStorage registry as fallback for login
+      saveUserToRegistry({
+        userId: input.username,
+        password: input.password,
+        name: input.name,
+        accessLevel: input.accessLevel,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -505,7 +601,17 @@ export function useUpdateLocalUser() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
 
       const userInput: LocalUserInput = {
         username: input.username,
@@ -517,12 +623,24 @@ export function useUpdateLocalUser() {
         email: input.email || "",
         notes: input.notes,
       };
-      await actor.updateLocalUserWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
-        userInput,
+      await withAuthErrorHandling(() =>
+        actor.updateLocalUserWithCreds(
+          creds.username,
+          creds.password,
+          BigInt(id),
+          userInput,
+        ),
       );
+
+      // Update registry if password provided
+      if (input.password) {
+        saveUserToRegistry({
+          userId: input.username,
+          password: input.password,
+          name: input.name,
+          accessLevel: input.accessLevel,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -540,15 +658,60 @@ export function useDeleteLocalUser() {
       if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
-        throw new Error("Not authenticated");
-      await actor.deleteLocalUserWithCreds(
-        creds.username,
-        creds.password,
-        BigInt(id),
+        throw new Error(
+          "Session expired — please log out and log back in to continue.",
+        );
+
+      // Re-sync before mutation
+      await syncCredentialsToBackend(actor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      });
+
+      await withAuthErrorHandling(() =>
+        actor.deleteLocalUserWithCreds(
+          creds.username,
+          creds.password,
+          BigInt(id),
+        ),
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
     },
   });
+}
+
+// ── Local User Registry ───────────────────────────────────────────────────────
+// Stored in localStorage so newly-created users can log in even after backend
+// restarts / redeployments.
+
+interface RegistryUser {
+  userId: string;
+  password: string;
+  name: string;
+  accessLevel: string;
+}
+
+function getRegistry(): RegistryUser[] {
+  try {
+    const raw = localStorage.getItem("localUserRegistry");
+    if (!raw) return [];
+    return JSON.parse(raw) as RegistryUser[];
+  } catch {
+    return [];
+  }
+}
+
+function saveUserToRegistry(user: RegistryUser): void {
+  const registry = getRegistry();
+  const idx = registry.findIndex((u) => u.userId === user.userId);
+  if (idx >= 0) {
+    registry[idx] = user;
+  } else {
+    registry.push(user);
+  }
+  localStorage.setItem("localUserRegistry", JSON.stringify(registry));
 }

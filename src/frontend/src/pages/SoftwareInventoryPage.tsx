@@ -277,9 +277,13 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
       setModalOpen(false);
       setEditTarget(null);
       setForm(EMPTY_FORM);
-    } catch {
+    } catch (err: unknown) {
       toast.error(
-        editTarget ? "Failed to update software" : "Failed to add software",
+        err instanceof Error
+          ? err.message
+          : editTarget
+            ? "Failed to update software"
+            : "Failed to add software",
       );
     }
   };
@@ -292,8 +296,10 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
           await deleteSoftware.mutateAsync(deleteTarget.id);
           toast.success("Software deleted");
           setDeleteTarget(null);
-        } catch {
-          toast.error("Failed to delete software");
+        } catch (err: unknown) {
+          toast.error(
+            err instanceof Error ? err.message : "Failed to delete software",
+          );
         }
       });
       setReLoginOpen(true);
@@ -303,8 +309,10 @@ export function SoftwareInventoryPage({ onBack, initialLicenseFilter }: Props) {
       await deleteSoftware.mutateAsync(deleteTarget.id);
       toast.success("Software deleted");
       setDeleteTarget(null);
-    } catch {
-      toast.error("Failed to delete software");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete software",
+      );
     }
   };
 

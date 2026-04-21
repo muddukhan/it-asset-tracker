@@ -21,14 +21,16 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LocalSessionContext,
   clearPersistedSession,
   loadPersistedSession,
+  loadSessionPassword,
   persistSession,
 } from "./context/LocalSessionContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { getActor } from "./hooks/useActor";
 import {
   InternetIdentityProvider,
   useInternetIdentity,
@@ -40,6 +42,7 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SoftwareInventoryPage } from "./pages/SoftwareInventoryPage";
+import { syncCredentialsToBackend } from "./utils/backendSync";
 
 const queryClient = new QueryClient();
 
@@ -62,8 +65,9 @@ export type { LocalSession } from "./context/LocalSessionContext";
 function loadLocalSession(): LocalSession | null {
   const persisted = loadPersistedSession();
   if (!persisted) return null;
-  // password is empty — will be filled when user logs in interactively
-  return { ...persisted, password: "" };
+  // Restore password from sessionStorage (tab-scoped) so mutations work after page refresh
+  const password = loadSessionPassword();
+  return { ...persisted, password };
 }
 
 const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
@@ -100,8 +104,33 @@ function AppShell() {
   const [previousPage, setPreviousPage] = useState<NavPage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // On app startup: if credentials sync is pending, retry in the background.
+  // We snapshot session values into local vars so the effect has no reactive deps.
+  const _startupUsername = localSession?.username ?? "";
+  const _startupPassword = localSession?.password ?? "";
+  const _startupName = localSession?.name ?? "";
+  const _startupAccessLevel = localSession?.accessLevel ?? "";
+  useEffect(() => {
+    const pending = localStorage.getItem("pendingBackendSync");
+    if (pending && _startupUsername && _startupPassword) {
+      getActor()
+        .then((actor) =>
+          syncCredentialsToBackend(actor, {
+            username: _startupUsername,
+            password: _startupPassword,
+            name: _startupName,
+            accessLevel: _startupAccessLevel,
+          }),
+        )
+        .then((ok) => {
+          if (ok) localStorage.removeItem("pendingBackendSync");
+        })
+        .catch(() => {});
+    }
+  }, [_startupUsername, _startupPassword, _startupName, _startupAccessLevel]);
+
   const handleLocalLogout = () => {
-    clearPersistedSession();
+    clearPersistedSession(); // clears both localStorage and sessionStorage
     setLocalSession(null);
   };
 

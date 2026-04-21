@@ -9,12 +9,65 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import { useState } from "react";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { toast } from "sonner";
-import { persistSession } from "../context/LocalSessionContext";
-import { LocalSessionContext } from "../context/LocalSessionContext";
+import {
+  LocalSessionContext,
+  persistSession,
+} from "../context/LocalSessionContext";
 import { getActor } from "../hooks/useActor";
+import { syncCredentialsToBackend } from "../utils/backendSync";
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+interface JsonUser {
+  userId: string;
+  password: string;
+  name: string;
+  accessLevel: string;
+}
+
+async function findUserInJson(
+  username: string,
+  password: string,
+): Promise<JsonUser | null> {
+  try {
+    const res = await fetch("/users.json");
+    if (!res.ok) return null;
+    const data = (await res.json()) as { users: JsonUser[] };
+    return (
+      data.users.find(
+        (u) => u.userId === username && u.password === password,
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function findUserInRegistry(
+  username: string,
+  password: string,
+): JsonUser | null {
+  try {
+    const raw = localStorage.getItem("localUserRegistry");
+    if (!raw) return null;
+    const registry = JSON.parse(raw) as Array<{
+      userId: string;
+      password: string;
+      name: string;
+      accessLevel: string;
+    }>;
+    return (
+      registry.find((u) => u.userId === username && u.password === password) ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 type Props = {
   open: boolean;
@@ -39,21 +92,80 @@ export function ReLoginDialog({ open, username, onSuccess, onCancel }: Props) {
     setLoading(true);
     try {
       const actor = await getActor();
+
+      // ── Path A: Backend has the credentials (normal case) ─────────────────
       const result = await actor.loginLocalUser(username, password);
-      if (!result) {
-        setError("Incorrect password");
+      if (result) {
+        const session = {
+          username,
+          name: result.name,
+          accessLevel: result.accessLevel,
+          password,
+        };
+        // persistSession now stores password in BOTH localStorage and sessionStorage
+        persistSession(session);
+        setLocalSession(session);
+        setPassword("");
+        onSuccess(password);
         return;
       }
-      const session = {
-        username,
-        name: result.name,
-        accessLevel: result.accessLevel,
-        password,
-      };
-      persistSession(session);
-      setLocalSession(session);
-      setPassword("");
-      onSuccess(password);
+
+      // ── Path B: Backend is empty (after redeployment) — try users.json ────
+      const jsonUser = await findUserInJson(username, password);
+      if (jsonUser) {
+        const synced = await syncCredentialsToBackend(actor, {
+          username: jsonUser.userId,
+          password,
+          name: jsonUser.name,
+          accessLevel: jsonUser.accessLevel,
+        });
+        if (!synced) {
+          console.error("ReLogin: Could not sync user after 3 attempts.");
+          localStorage.setItem("pendingBackendSync", "1");
+        } else {
+          localStorage.removeItem("pendingBackendSync");
+        }
+        const session = {
+          username: jsonUser.userId,
+          name: jsonUser.name,
+          accessLevel: jsonUser.accessLevel,
+          password,
+        };
+        persistSession(session);
+        setLocalSession(session);
+        setPassword("");
+        onSuccess(password);
+        return;
+      }
+
+      // ── Path C: Check localStorage registry ───────────────────────────────
+      const registryUser = findUserInRegistry(username, password);
+      if (registryUser) {
+        const synced = await syncCredentialsToBackend(actor, {
+          username: registryUser.userId,
+          password,
+          name: registryUser.name,
+          accessLevel: registryUser.accessLevel,
+        });
+        if (!synced) {
+          localStorage.setItem("pendingBackendSync", "1");
+        } else {
+          localStorage.removeItem("pendingBackendSync");
+        }
+        const session = {
+          username: registryUser.userId,
+          name: registryUser.name,
+          accessLevel: registryUser.accessLevel,
+          password,
+        };
+        persistSession(session);
+        setLocalSession(session);
+        setPassword("");
+        onSuccess(password);
+        return;
+      }
+
+      setError("Incorrect password");
     } catch {
       toast.error("Could not verify credentials — try again");
     } finally {

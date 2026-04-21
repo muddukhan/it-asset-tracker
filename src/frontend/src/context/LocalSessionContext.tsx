@@ -1,18 +1,21 @@
 import { createContext, useContext, useState } from "react";
 
 // ── Session shape ─────────────────────────────────────────────────────────────
-// password is stored in React state (in-memory) ONLY — never in localStorage.
-// localStorage only persists {username, name, accessLevel} for "soft restore".
+// username/name/accessLevel/password are all persisted in localStorage.
+// sessionStorage is also written as a secondary copy (faster read in same tab).
 
 export interface LocalSession {
   name: string;
   accessLevel: string;
   username: string;
-  /** In-memory only. Never written to localStorage or any persistent store. */
+  /**
+   * Stored in localStorage (key: session_password) AND sessionStorage.
+   * localStorage copy survives tab close/reopen so mutations work seamlessly.
+   */
   password: string;
 }
 
-/** What gets persisted to localStorage (no password) */
+/** What gets persisted to localStorage for the session itself (no password in this object) */
 interface PersistedSession {
   username: string;
   name: string;
@@ -35,11 +38,7 @@ export function useLocalSession() {
 
 /**
  * Returns {username, password} for use in WithCreds backend calls.
- * Returns null if:
- *   - No session is active
- *   - Session accessLevel is not 'admin'
- *   - Password is empty (session was restored from localStorage after a refresh
- *     but user hasn't re-entered password yet)
+ * Returns null if no session is active or password is missing.
  */
 export function useLocalAdminCreds(): {
   username: string;
@@ -67,19 +66,29 @@ export function useLocalCreds(): { username: string; password: string } | null {
 // ── Persistence helpers ───────────────────────────────────────────────────────
 
 const SESSION_KEY = "localUserSession";
+const SESSION_PWD_KEY = "session_password"; // localStorage key (persists tab close)
+const SESSION_PWD_SS_KEY = "localSessionPwd"; // sessionStorage key (legacy compat)
 
 export function persistSession(session: LocalSession): void {
   const persisted: PersistedSession = {
     username: session.username,
     name: session.name,
     accessLevel: session.accessLevel,
-    // password intentionally omitted
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(persisted));
+
+  // Store password in BOTH localStorage (survives tab close) and sessionStorage (fast read)
+  if (session.password) {
+    localStorage.setItem(SESSION_PWD_KEY, session.password);
+    sessionStorage.setItem(SESSION_PWD_SS_KEY, session.password);
+  }
 }
 
 export function clearPersistedSession(): void {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_PWD_KEY);
+  sessionStorage.removeItem(SESSION_PWD_SS_KEY);
+  localStorage.removeItem("pendingBackendSync");
 }
 
 export function loadPersistedSession(): PersistedSession | null {
@@ -90,4 +99,16 @@ export function loadPersistedSession(): PersistedSession | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Load the persisted password, checking sessionStorage first (faster),
+ * then falling back to localStorage (survives tab close).
+ */
+export function loadSessionPassword(): string {
+  return (
+    sessionStorage.getItem(SESSION_PWD_SS_KEY) ??
+    localStorage.getItem(SESSION_PWD_KEY) ??
+    ""
+  );
 }

@@ -243,11 +243,15 @@ export function AssetModal({ open, onClose, asset }: Props) {
       onClose();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Not authenticated")) {
+      if (
+        msg.includes("Session expired") ||
+        msg.includes("Not authenticated") ||
+        msg.includes("session")
+      ) {
         setPendingSubmit(true);
         setReLoginOpen(true);
       } else {
-        toast.error("Failed to save asset");
+        toast.error(msg || "Failed to save asset");
       }
     }
   };

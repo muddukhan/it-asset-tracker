@@ -243,8 +243,10 @@ export function InventoryPage({
           await deleteAsset.mutateAsync(deleteTarget.id);
           toast.success("Asset deleted");
           setDeleteTarget(null);
-        } catch {
-          toast.error("Failed to delete asset");
+        } catch (err: unknown) {
+          toast.error(
+            err instanceof Error ? err.message : "Failed to delete asset",
+          );
         }
       });
       setReLoginOpen(true);
@@ -254,8 +256,10 @@ export function InventoryPage({
       await deleteAsset.mutateAsync(deleteTarget.id);
       toast.success("Asset deleted");
       setDeleteTarget(null);
-    } catch {
-      toast.error("Failed to delete asset");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete asset",
+      );
     }
   };
 

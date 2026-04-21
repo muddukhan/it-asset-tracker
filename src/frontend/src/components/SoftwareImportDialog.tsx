@@ -17,8 +17,11 @@ import {
 import { Download, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { useLocalSession } from "../context/LocalSessionContext";
+import { getActor } from "../hooks/useActor";
 import { useAddSoftware } from "../hooks/useSoftwareQueries";
 import { parseCsv } from "../lib/csvImport";
+import { syncCredentialsToBackend } from "../utils/backendSync";
 
 const TEMPLATE_HEADERS =
   "assetTag,assignedTo,softwareName,vendor,purchaseDate,licenseExpiry,licenseType,licenseKey,employeeCode,employeeName,invoiceNumber,notes";
@@ -49,6 +52,7 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [importing, setImporting] = useState(false);
   const addSoftware = useAddSoftware();
+  const localSession = useLocalSession();
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -63,10 +67,42 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
   }
 
   async function handleImport() {
+    if (!localSession?.username || !localSession?.password) {
+      toast.error(
+        "Admin credentials not available. Please log out and log in again.",
+      );
+      return;
+    }
+
     setImporting(true);
+
+    // Pre-sync credentials ONCE before starting the import loop
+    try {
+      const actor = await getActor();
+      const synced = await syncCredentialsToBackend(actor, {
+        username: localSession.username,
+        password: localSession.password,
+        name: localSession.name,
+        accessLevel: localSession.accessLevel,
+      });
+      if (!synced) {
+        toast.error(
+          "Admin credentials not synced. Please log out and log in again.",
+        );
+        setImporting(false);
+        return;
+      }
+    } catch {
+      toast.error("Could not connect to backend. Please try again.");
+      setImporting(false);
+      return;
+    }
+
     let success = 0;
-    let failed = 0;
-    for (const row of rows) {
+    const failedRows: number[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
       try {
         await addSoftware.mutateAsync({
           assetTag: row.assetTag || undefined,
@@ -81,18 +117,25 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
           notes: row.notes || undefined,
         });
         success++;
-      } catch {
-        failed++;
+      } catch (err) {
+        console.error(`Row ${i + 1} import failed:`, err);
+        failedRows.push(i + 1);
+        // Continue with remaining rows — don't abort entire import
       }
     }
+
     setImporting(false);
-    if (failed === 0) {
+
+    if (failedRows.length === 0) {
       toast.success(
         `Successfully imported ${success} software record${success !== 1 ? "s" : ""}`,
       );
     } else {
-      toast.error(`Imported ${success}, failed ${failed}`);
+      toast.error(
+        `Imported ${success} record${success !== 1 ? "s" : ""}. Failed rows: ${failedRows.join(", ")}`,
+      );
     }
+
     setRows([]);
     if (fileRef.current) fileRef.current.value = "";
     onOpenChange(false);
@@ -126,7 +169,7 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
 
           <div>
             <label
-              htmlFor="csv-file-input"
+              htmlFor="sw-csv-file-input"
               className="text-sm font-medium text-foreground block mb-1.5"
             >
               Select CSV File
@@ -136,7 +179,7 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
               type="file"
               accept=".csv"
               onChange={handleFile}
-              id="csv-file-input"
+              id="sw-csv-file-input"
               data-ocid="software_import.upload_button"
               className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-input file:text-xs file:font-medium file:bg-background file:text-foreground hover:file:bg-accent cursor-pointer"
             />
