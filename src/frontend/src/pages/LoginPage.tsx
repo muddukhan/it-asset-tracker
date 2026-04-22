@@ -59,26 +59,37 @@ async function findUserInJson(
 
 /**
  * Try to login via the backend canister.
- * Returns null if the canister is unreachable, empty, or rejects the credentials.
- * NEVER throws — all errors are swallowed and treated as "not found".
+ * Returns { user, backendAvailable: true } on success.
+ * Returns { user: null, backendAvailable: false } if canister is unreachable.
+ * Returns { user: null, backendAvailable: true } if credentials are wrong on backend.
+ * NEVER throws — all errors are handled gracefully.
  */
 async function tryBackendLogin(
   username: string,
   password: string,
-): Promise<{ name: string; accessLevel: string; username: string } | null> {
+): Promise<{
+  user: { name: string; accessLevel: string; username: string } | null;
+  backendAvailable: boolean;
+}> {
   try {
     const actor = await getActor();
-    if (!actor) return null;
+    if (!actor) return { user: null, backendAvailable: false };
     const result = await actor.loginLocalUser(username, password);
-    if (!result) return null;
-    return { name: result.name, accessLevel: result.accessLevel, username };
+    if (!result) {
+      // Backend is up but credentials not found — still treat as available
+      return { user: null, backendAvailable: true };
+    }
+    return {
+      user: { name: result.name, accessLevel: result.accessLevel, username },
+      backendAvailable: true,
+    };
   } catch (err) {
-    // Canister unreachable or threw — fall through to users.json
+    // Canister unreachable — flag as unavailable so we skip sync
     console.warn(
-      "[LoginPage] Backend loginLocalUser failed (will try fallback):",
+      "[LoginPage] Backend unreachable (will skip sync and use fallback):",
       err,
     );
-    return null;
+    return { user: null, backendAvailable: false };
   }
 }
 
@@ -103,8 +114,12 @@ export function LoginPage({
     setLocalLoading(true);
 
     try {
-      // ── Step 1: Try backend directly (normal case after first login) ──────────
-      const backendUser = await tryBackendLogin(usernameClean, passwordClean);
+      // ── Step 1: Try backend (normal case after first login) ───────────────────
+      const { user: backendUser, backendAvailable } = await tryBackendLogin(
+        usernameClean,
+        passwordClean,
+      );
+
       if (backendUser) {
         console.log("[LoginPage] Authenticated via backend canister");
         const session: LocalSession = {
@@ -124,7 +139,9 @@ export function LoginPage({
       }
 
       // ── Step 2: Fallback — check users.json ───────────────────────────────────
-      console.log("[LoginPage] Backend returned null — checking users.json");
+      console.log(
+        "[LoginPage] Backend returned null — checking users.json and registry",
+      );
       const jsonUser = await findUserInJson(usernameClean, passwordClean);
 
       // ── Step 3: Fallback — check localStorage registry ────────────────────────
@@ -134,6 +151,7 @@ export function LoginPage({
         accessLevel: string;
         password: string;
       } | null = null;
+
       if (jsonUser) {
         foundUser = jsonUser;
         console.log("[LoginPage] Found user in users.json:", jsonUser.userId);
@@ -159,39 +177,40 @@ export function LoginPage({
         return;
       }
 
-      // ── Step 4: Sync credentials to backend (AWAITED) ─────────────────────────
-      // We always attempt sync. If it returns false (conflicting password in stale
-      // canister), we still allow login since we validated against users.json/registry.
-      let syncOk = false;
-      try {
-        const actor = await getActor();
-        syncOk = await syncCredentialsToBackend(actor, {
-          username: foundUser.userId,
-          password: passwordClean,
-          name: foundUser.name,
-          accessLevel: foundUser.accessLevel,
-        });
-        console.log("[LoginPage] syncCredentialsToBackend result:", syncOk);
-      } catch (syncErr) {
+      // ── Step 4: Sync credentials to backend ONLY if backend is available ──────
+      // If backend was unreachable, skip sync entirely — we still allow login.
+      // This is the key fix: don't attempt a sync that will time out and fail.
+      if (backendAvailable) {
+        try {
+          const actor = await getActor();
+          const syncOk = await syncCredentialsToBackend(actor, {
+            username: foundUser.userId,
+            password: passwordClean,
+            name: foundUser.name,
+            accessLevel: foundUser.accessLevel,
+          });
+          console.log("[LoginPage] syncCredentialsToBackend result:", syncOk);
+          if (!syncOk) {
+            localStorage.setItem("pendingBackendSync", "1");
+          } else {
+            localStorage.removeItem("pendingBackendSync");
+          }
+        } catch (syncErr) {
+          console.warn(
+            "[LoginPage] syncCredentialsToBackend threw (setting pending flag):",
+            syncErr,
+          );
+          localStorage.setItem("pendingBackendSync", "1");
+        }
+      } else {
+        // Backend unreachable — mark as pending sync for next startup
         console.warn(
-          "[LoginPage] syncCredentialsToBackend threw (will set pending flag):",
-          syncErr,
-        );
-        syncOk = false;
-      }
-
-      if (!syncOk) {
-        // Could not register in backend (network error or conflicting entry).
-        // Still allow login — flag for retry on next startup.
-        console.warn(
-          "[LoginPage] Sync failed — setting pendingBackendSync flag",
+          "[LoginPage] Backend unavailable — skipping sync, flagging for retry",
         );
         localStorage.setItem("pendingBackendSync", "1");
-      } else {
-        localStorage.removeItem("pendingBackendSync");
       }
 
-      // ── Step 5: Create session (AFTER sync attempt) ───────────────────────────
+      // ── Step 5: Create session ────────────────────────────────────────────────
       const session: LocalSession = {
         name: foundUser.name,
         accessLevel: foundUser.accessLevel,
@@ -201,13 +220,14 @@ export function LoginPage({
       persistSession(session);
 
       // Background migration — don't block login
-      getActor()
-        .then((actor) => runMigrationIfNeeded(actor))
-        .catch(() => {});
+      if (backendAvailable) {
+        getActor()
+          .then((actor) => runMigrationIfNeeded(actor))
+          .catch(() => {});
+      }
 
       onLocalLogin(session);
     } catch (err) {
-      // This outer catch only fires if something truly unexpected went wrong
       console.error("[LoginPage] Unexpected login error:", err);
       setLocalError("Login failed — please try again");
     } finally {
@@ -341,18 +361,6 @@ export function LoginPage({
             </Button>
           </div>
         </div>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()}.{" "}
-          <a
-            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-foreground transition-colors"
-          >
-            Built with caffeine.ai
-          </a>
-        </p>
       </motion.div>
     </div>
   );

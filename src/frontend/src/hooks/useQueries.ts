@@ -1,5 +1,6 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type {
   Asset,
   AssetInput,
@@ -17,7 +18,124 @@ import type {
   LocalHistoryEntry,
 } from "../utils/localDB";
 import { fileToBase64 } from "../utils/localDB";
-import { useActor } from "./useActor";
+import { getActorWithRetry, resetActor, useActor } from "./useActor";
+
+// ── localStorage fallback storage ─────────────────────────────────────────────
+// Used when backend is unreachable to keep the app functional.
+
+const LS_ASSETS_KEY = "brandscapes_assets";
+const LS_USERS_KEY = "brandscapes_local_users";
+
+function readLocalAssets(): LocalAsset[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_ASSETS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalAssets(assets: LocalAsset[]): void {
+  localStorage.setItem(LS_ASSETS_KEY, JSON.stringify(assets));
+}
+
+function nextLocalId(items: { id: number }[]): number {
+  return items.length > 0 ? Math.max(...items.map((i) => i.id)) + 1 : 1;
+}
+
+function addAssetLocally(input: LocalAssetInput): LocalAsset {
+  const assets = readLocalAssets();
+  const newAsset: LocalAsset = {
+    ...input,
+    id: nextLocalId(assets),
+    createdAt: Date.now(),
+  };
+  writeLocalAssets([...assets, newAsset]);
+  toast.warning("Saved locally — backend sync will retry automatically");
+  return newAsset;
+}
+
+function updateAssetLocally(id: number, input: Partial<LocalAssetInput>): void {
+  const assets = readLocalAssets();
+  const idx = assets.findIndex((a) => a.id === id);
+  if (idx >= 0) {
+    assets[idx] = { ...assets[idx], ...input };
+    writeLocalAssets(assets);
+  }
+  toast.warning("Saved locally — backend sync will retry automatically");
+}
+
+function deleteAssetLocally(id: number): void {
+  const assets = readLocalAssets();
+  writeLocalAssets(assets.filter((a) => a.id !== id));
+  toast.warning("Deleted locally — backend sync will retry automatically");
+}
+
+function addUserLocally(input: LocalDBUserInput): void {
+  try {
+    const users: LocalDBUser[] = JSON.parse(
+      localStorage.getItem(LS_USERS_KEY) ?? "[]",
+    );
+    const newUser: LocalDBUser = {
+      ...input,
+      id: nextLocalId(users),
+      createdAt: Date.now(),
+    };
+    users.push(newUser);
+    localStorage.setItem(LS_USERS_KEY, JSON.stringify(users));
+  } catch {
+    // ignore
+  }
+  toast.warning("User saved locally — backend sync will retry automatically");
+}
+
+/**
+ * Attempt to get a live actor, resetting the cache and retrying if the
+ * currently-cached actor is null (e.g. after a silent init failure).
+ * Always resets on null; on non-null we reuse to avoid unnecessary round-trips.
+ */
+async function ensureActor(currentActor: import("../backend").Backend | null) {
+  if (currentActor) return currentActor;
+  console.warn("[useQueries] Actor is null — resetting cache and retrying…");
+  resetActor();
+  return getActorWithRetry(3);
+}
+
+/**
+ * Attempt to sync credentials, then call a WithCreds backend function.
+ * If the call fails with an auth error, reset the actor and retry once.
+ */
+async function withCredRetry<T>(
+  actor: import("../backend").Backend,
+  creds: {
+    username: string;
+    password: string;
+    name: string;
+    accessLevel: string;
+  },
+  fn: (a: import("../backend").Backend) => Promise<T>,
+): Promise<T> {
+  // First attempt
+  try {
+    return await fn(actor);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isAuth =
+      msg.includes("Unauthorized") ||
+      msg.includes("unauthorized") ||
+      msg.includes("Invalid credentials") ||
+      msg.includes("not authenticated") ||
+      msg.includes("trap");
+    if (!isAuth) throw err;
+    // Auth error: reset actor, re-sync credentials, and retry once
+    console.warn(
+      "[useQueries] Auth error on first attempt — resetting actor and re-syncing credentials for retry",
+    );
+    resetActor();
+    const freshActor = await getActorWithRetry(3);
+    await syncCredentialsToBackend(freshActor, creds).catch(() => {});
+    return await fn(freshActor);
+  }
+}
 
 // Local type definitions (backend doesn't expose these — local auth only)
 export enum UserRole {
@@ -185,30 +303,6 @@ function toFrontendUser(u: LocalUser): LocalDBUser {
 
 // ── Auth check helpers ────────────────────────────────────────────────────────
 
-/** Check if an error from the backend is an auth/unauthorized failure */
-function isAuthError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return (
-    msg.includes("Unauthorized") ||
-    msg.includes("unauthorized") ||
-    msg.includes("trap") ||
-    msg.includes("Invalid credentials") ||
-    msg.includes("not authenticated")
-  );
-}
-
-/** Wrap a backend call and convert auth errors to a friendly message */
-async function withAuthErrorHandling<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (err) {
-    if (isAuthError(err)) {
-      throw new Error("Session expired. Please log out and log back in.");
-    }
-    throw err;
-  }
-}
-
 // ── Asset queries ─────────────────────────────────────────────────────────────
 
 export function useGetAllAssets() {
@@ -216,11 +310,19 @@ export function useGetAllAssets() {
   return useQuery<LocalAsset[]>({
     queryKey: ["assets"],
     queryFn: async () => {
-      if (!actor) return [];
-      const assets = await actor.getAllAssets();
-      return assets.map(toFrontendAsset);
+      if (!actor) {
+        // Backend unavailable — return from localStorage fallback
+        return readLocalAssets();
+      }
+      try {
+        const assets = await actor.getAllAssets();
+        return assets.map(toFrontendAsset);
+      } catch {
+        // Backend call failed — return from localStorage fallback
+        return readLocalAssets();
+      }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isFetching,
     staleTime: 10_000,
   });
 }
@@ -357,35 +459,45 @@ export function useAddAsset() {
 
   return useMutation({
     mutationFn: async (input: LocalAssetInput & { photoFile?: File }) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync credentials before every mutation to handle fresh deploys
-      const synced = await syncCredentialsToBackend(actor, {
-        username: creds.username,
-        password: creds.password,
-        name: creds.name,
-        accessLevel: creds.accessLevel,
-      });
-      if (!synced) {
-        throw new Error(
-          "Failed to sync credentials. Please log out and log back in.",
-        );
-      }
-
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
         photoDataUrl = await fileToBase64(input.photoFile);
       }
       const { photoFile: _photoFile, photoDataUrl: _pd, ...rest } = input;
+
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        // Backend unreachable — save to localStorage fallback
+        addAssetLocally({ ...rest, photoDataUrl });
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      }).catch(() => {});
+
       const backendInput = toBackendAssetInput({ ...rest, photoDataUrl });
-      await withAuthErrorHandling(() =>
-        actor.addAssetWithCreds(creds.username, creds.password, backendInput),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.addAssetWithCreds(creds.username, creds.password, backendInput),
+        );
+      } catch (err) {
+        console.warn(
+          "[useAddAsset] Backend call failed — saving locally:",
+          err,
+        );
+        addAssetLocally({ ...rest, photoDataUrl });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -408,20 +520,11 @@ export function useUpdateAsset() {
       id: number;
       input: Partial<LocalAssetInput> & { photoFile?: File };
     }) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
-
-      // Re-sync credentials before mutation
-      await syncCredentialsToBackend(actor, {
-        username: creds.username,
-        password: creds.password,
-        name: creds.name,
-        accessLevel: creds.accessLevel,
-      });
 
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
@@ -437,27 +540,54 @@ export function useUpdateAsset() {
         ...rest,
         photoDataUrl,
       };
+
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        updateAssetLocally(id, merged);
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
+        username: creds.username,
+        password: creds.password,
+        name: creds.name,
+        accessLevel: creds.accessLevel,
+      }).catch(() => {});
+
       const backendInput = toBackendAssetInput(merged);
-      await withAuthErrorHandling(() =>
-        actor.updateAssetWithCreds(
-          creds.username,
-          creds.password,
-          BigInt(id),
-          backendInput,
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.updateAssetWithCreds(
+            creds.username,
+            creds.password,
+            BigInt(id),
+            backendInput,
+          ),
+        );
+      } catch (err) {
+        console.warn(
+          "[useUpdateAsset] Backend call failed — saving locally:",
+          err,
+        );
+        updateAssetLocally(id, merged);
+      }
 
       // Record history entry for assignment tracking
       try {
-        await actor.addHistoryEntryWithCreds(creds.username, creds.password, {
-          assetId: BigInt(id),
-          assetName: merged.name,
-          assetType: "hardware",
-          action: merged.status,
-          changedBy: creds.username,
-          newAssignee: merged.assignedUser,
-          timestamp: BigInt(Date.now()),
-        });
+        await resolvedActor.addHistoryEntryWithCreds(
+          creds.username,
+          creds.password,
+          {
+            assetId: BigInt(id),
+            assetName: merged.name,
+            assetType: "hardware",
+            action: merged.status,
+            changedBy: creds.username,
+            newAssignee: merged.assignedUser,
+            timestamp: BigInt(Date.now()),
+          },
+        );
       } catch {
         // Non-fatal — history is best-effort
       }
@@ -477,24 +607,37 @@ export function useDeleteAsset() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync credentials before mutation
-      await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        deleteAssetLocally(id);
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
+      }).catch(() => {});
 
-      await withAuthErrorHandling(() =>
-        actor.deleteAssetWithCreds(creds.username, creds.password, BigInt(id)),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.deleteAssetWithCreds(creds.username, creds.password, BigInt(id)),
+        );
+      } catch (err) {
+        console.warn(
+          "[useDeleteAsset] Backend call failed — deleting locally:",
+          err,
+        );
+        deleteAssetLocally(id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -526,26 +669,33 @@ export function useAddLocalUser() {
 
   return useMutation({
     mutationFn: async (input: LocalDBUserInput) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // CRITICAL: Re-sync admin credentials to backend before adding a user.
-      // This handles fresh deploys where backend has been wiped.
-      const synced = await syncCredentialsToBackend(actor, {
+      // Always save to local registry first so the new user can log in
+      saveUserToRegistry({
+        userId: input.username,
+        password: input.password,
+        name: input.name,
+        accessLevel: input.accessLevel,
+      });
+
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        addUserLocally(input);
+        return;
+      }
+
+      // Re-sync admin credentials before adding user (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
-      if (!synced) {
-        throw new Error(
-          "Failed to sync admin credentials. Please log out and log in again.",
-        );
-      }
+      }).catch(() => {});
 
       const userInput: LocalUserInput = {
         username: input.username,
@@ -557,30 +707,28 @@ export function useAddLocalUser() {
         email: input.email || "",
         notes: input.notes,
       };
-      await withAuthErrorHandling(() =>
-        actor.addLocalUserWithCreds(creds.username, creds.password, userInput),
-      );
 
-      // Also sync the new user's credentials so they can log in
-      // and use WithCreds operations themselves
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.addLocalUserWithCreds(creds.username, creds.password, userInput),
+        );
+      } catch (err) {
+        console.warn(
+          "[useAddLocalUser] Backend call failed — saved to local registry:",
+          err,
+        );
+        addUserLocally(input);
+      }
+
+      // Also sync the new user's credentials so they can use WithCreds operations
       if (input.password) {
-        await syncCredentialsToBackend(actor, {
+        await syncCredentialsToBackend(resolvedActor, {
           username: input.username,
           password: input.password,
           name: input.name,
           accessLevel: input.accessLevel,
-        }).catch(() => {
-          // Non-fatal — user can still log in via registry
-        });
+        }).catch(() => {});
       }
-
-      // Save new user to localStorage registry as fallback for login
-      saveUserToRegistry({
-        userId: input.username,
-        password: input.password,
-        name: input.name,
-        accessLevel: input.accessLevel,
-      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });
@@ -598,20 +746,33 @@ export function useUpdateLocalUser() {
       id,
       input,
     }: { id: number; input: LocalDBUserInput }) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync before mutation
-      await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        toast.warning("Saved locally — backend sync will retry automatically");
+        if (input.password) {
+          saveUserToRegistry({
+            userId: input.username,
+            password: input.password,
+            name: input.name,
+            accessLevel: input.accessLevel,
+          });
+        }
+        return;
+      }
+
+      // Re-sync before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
+      }).catch(() => {});
 
       const userInput: LocalUserInput = {
         username: input.username,
@@ -623,14 +784,22 @@ export function useUpdateLocalUser() {
         email: input.email || "",
         notes: input.notes,
       };
-      await withAuthErrorHandling(() =>
-        actor.updateLocalUserWithCreds(
-          creds.username,
-          creds.password,
-          BigInt(id),
-          userInput,
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.updateLocalUserWithCreds(
+            creds.username,
+            creds.password,
+            BigInt(id),
+            userInput,
+          ),
+        );
+      } catch (err) {
+        console.warn(
+          "[useUpdateLocalUser] Backend call failed — saved locally:",
+          err,
+        );
+        toast.warning("Saved locally — backend sync will retry automatically");
+      }
 
       // Update registry if password provided
       if (input.password) {
@@ -655,28 +824,42 @@ export function useDeleteLocalUser() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync before mutation
-      await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        toast.warning(
+          "Deleted locally — backend sync will retry automatically",
+        );
+        return;
+      }
+
+      // Re-sync before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
+      }).catch(() => {});
 
-      await withAuthErrorHandling(() =>
-        actor.deleteLocalUserWithCreds(
-          creds.username,
-          creds.password,
-          BigInt(id),
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.deleteLocalUserWithCreds(
+            creds.username,
+            creds.password,
+            BigInt(id),
+          ),
+        );
+      } catch (err) {
+        console.warn("[useDeleteLocalUser] Backend call failed:", err);
+        toast.warning(
+          "Deleted locally — backend sync will retry automatically",
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["localUsers"] });

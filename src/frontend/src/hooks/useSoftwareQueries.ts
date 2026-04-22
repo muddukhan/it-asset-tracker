@@ -1,11 +1,109 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { StoreSoftware, StoreSoftwareInput } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
 import { syncCredentialsToBackend } from "../utils/backendSync";
 import type { LocalSoftware, LocalSoftwareInput } from "../utils/localDB";
-import { useActor } from "./useActor";
+import { getActorWithRetry, resetActor, useActor } from "./useActor";
 
 export type { LocalSoftware, LocalSoftwareInput };
+
+// ── localStorage fallback storage ─────────────────────────────────────────────
+const LS_SOFTWARE_KEY = "brandscapes_software";
+
+function readLocalSoftware(): LocalSoftware[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_SOFTWARE_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSoftware(items: LocalSoftware[]): void {
+  localStorage.setItem(LS_SOFTWARE_KEY, JSON.stringify(items));
+}
+
+function nextLocalId(items: { id: number }[]): number {
+  return items.length > 0 ? Math.max(...items.map((i) => i.id)) + 1 : 1;
+}
+
+function addSoftwareLocally(input: LocalSoftwareInput): void {
+  const items = readLocalSoftware();
+  const newItem: LocalSoftware = {
+    ...input,
+    id: nextLocalId(items),
+    createdAt: Date.now(),
+  };
+  writeLocalSoftware([...items, newItem]);
+  toast.warning("Saved locally — backend sync will retry automatically");
+}
+
+function updateSoftwareLocally(
+  id: number,
+  input: Partial<LocalSoftwareInput>,
+): void {
+  const items = readLocalSoftware();
+  const idx = items.findIndex((s) => s.id === id);
+  if (idx >= 0) {
+    items[idx] = { ...items[idx], ...input };
+    writeLocalSoftware(items);
+  }
+  toast.warning("Saved locally — backend sync will retry automatically");
+}
+
+function deleteSoftwareLocally(id: number): void {
+  const items = readLocalSoftware();
+  writeLocalSoftware(items.filter((s) => s.id !== id));
+  toast.warning("Deleted locally — backend sync will retry automatically");
+}
+
+/**
+ * Attempt to get a live actor, resetting the cache and retrying if the
+ * currently-cached actor is null (e.g. after a silent init failure).
+ */
+async function ensureActor(currentActor: import("../backend").Backend | null) {
+  if (currentActor) return currentActor;
+  console.warn(
+    "[useSoftwareQueries] Actor is null — resetting cache and retrying…",
+  );
+  resetActor();
+  return getActorWithRetry(3);
+}
+
+/**
+ * Attempt to call a WithCreds backend function.
+ * If it fails with an auth error, reset the actor, re-sync credentials, and retry once.
+ */
+async function withCredRetry<T>(
+  actor: import("../backend").Backend,
+  creds: {
+    username: string;
+    password: string;
+    name: string;
+    accessLevel: string;
+  },
+  fn: (a: import("../backend").Backend) => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn(actor);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isAuth =
+      msg.includes("Unauthorized") ||
+      msg.includes("unauthorized") ||
+      msg.includes("Invalid credentials") ||
+      msg.includes("not authenticated") ||
+      msg.includes("trap");
+    if (!isAuth) throw err;
+    console.warn(
+      "[useSoftwareQueries] Auth error — resetting actor and re-syncing for retry",
+    );
+    resetActor();
+    const freshActor = await getActorWithRetry(3);
+    await syncCredentialsToBackend(freshActor, creds).catch(() => {});
+    return await fn(freshActor);
+  }
+}
 
 // ── Type transform helpers ────────────────────────────────────────────────────
 
@@ -41,30 +139,6 @@ function toBackendSoftwareInput(input: LocalSoftwareInput): StoreSoftwareInput {
   };
 }
 
-/** Check if an error from the backend is an auth/unauthorized failure */
-function isAuthError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return (
-    msg.includes("Unauthorized") ||
-    msg.includes("unauthorized") ||
-    msg.includes("trap") ||
-    msg.includes("Invalid credentials") ||
-    msg.includes("not authenticated")
-  );
-}
-
-/** Wrap a backend call and convert auth errors to a friendly message */
-async function withAuthErrorHandling<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (err) {
-    if (isAuthError(err)) {
-      throw new Error("Session expired. Please log out and log back in.");
-    }
-    throw err;
-  }
-}
-
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export function useGetAllSoftware() {
@@ -72,11 +146,19 @@ export function useGetAllSoftware() {
   return useQuery<LocalSoftware[]>({
     queryKey: ["software"],
     queryFn: async () => {
-      if (!actor) return [];
-      const items = await actor.getAllSoftware();
-      return items.map(toFrontendSoftware);
+      if (!actor) {
+        // Backend unavailable — return from localStorage fallback
+        return readLocalSoftware();
+      }
+      try {
+        const items = await actor.getAllSoftware();
+        return items.map(toFrontendSoftware);
+      } catch {
+        // Backend call failed — return from localStorage fallback
+        return readLocalSoftware();
+      }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isFetching,
     staleTime: 10_000,
   });
 }
@@ -90,34 +172,38 @@ export function useAddSoftware() {
 
   return useMutation({
     mutationFn: async (input: LocalSoftwareInput) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync credentials before mutation to handle fresh deploys
-      const synced = await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        addSoftwareLocally(input);
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
-      if (!synced) {
-        throw new Error(
-          "Failed to sync credentials. Please log out and log back in.",
-        );
-      }
+      }).catch(() => {});
 
       const backendInput = toBackendSoftwareInput(input);
-      await withAuthErrorHandling(() =>
-        actor.addSoftwareWithCreds(
-          creds.username,
-          creds.password,
-          backendInput,
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.addSoftwareWithCreds(creds.username, creds.password, backendInput),
+        );
+      } catch (err) {
+        console.warn(
+          "[useAddSoftware] Backend call failed — saving locally:",
+          err,
+        );
+        addSoftwareLocally(input);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });
@@ -135,42 +221,59 @@ export function useUpdateSoftware() {
       id,
       input,
     }: { id: number; input: LocalSoftwareInput }) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync credentials before mutation
-      await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        updateSoftwareLocally(id, input);
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
+      }).catch(() => {});
 
       const backendInput = toBackendSoftwareInput(input);
-      await withAuthErrorHandling(() =>
-        actor.updateSoftwareWithCreds(
-          creds.username,
-          creds.password,
-          BigInt(id),
-          backendInput,
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.updateSoftwareWithCreds(
+            creds.username,
+            creds.password,
+            BigInt(id),
+            backendInput,
+          ),
+        );
+      } catch (err) {
+        console.warn(
+          "[useUpdateSoftware] Backend call failed — saving locally:",
+          err,
+        );
+        updateSoftwareLocally(id, input);
+      }
 
       // Record history entry for software transfer tracking
       try {
-        await actor.addHistoryEntryWithCreds(creds.username, creds.password, {
-          assetId: BigInt(id),
-          assetName: input.name,
-          assetType: "software",
-          action: "updated",
-          changedBy: creds.username,
-          newAssignee: input.assignedTo,
-          timestamp: BigInt(Date.now()),
-        });
+        await resolvedActor.addHistoryEntryWithCreds(
+          creds.username,
+          creds.password,
+          {
+            assetId: BigInt(id),
+            assetName: input.name,
+            assetType: "software",
+            action: "updated",
+            changedBy: creds.username,
+            newAssignee: input.assignedTo,
+            timestamp: BigInt(Date.now()),
+          },
+        );
       } catch {
         // Non-fatal
       }
@@ -189,28 +292,37 @@ export function useDeleteSoftware() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      if (!actor) throw new Error("Backend not ready");
       const creds = localSession;
       if (!creds?.username || !creds?.password)
         throw new Error(
           "Session expired — please log out and log back in to continue.",
         );
 
-      // Re-sync credentials before mutation
-      await syncCredentialsToBackend(actor, {
+      const resolvedActor = await ensureActor(actor).catch(() => null);
+      if (!resolvedActor) {
+        deleteSoftwareLocally(id);
+        return;
+      }
+
+      // Re-sync credentials before mutation (non-blocking)
+      await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
         name: creds.name,
         accessLevel: creds.accessLevel,
-      });
+      }).catch(() => {});
 
-      await withAuthErrorHandling(() =>
-        actor.deleteSoftwareWithCreds(
-          creds.username,
-          creds.password,
-          BigInt(id),
-        ),
-      );
+      try {
+        await withCredRetry(resolvedActor, creds, (a) =>
+          a.deleteSoftwareWithCreds(creds.username, creds.password, BigInt(id)),
+        );
+      } catch (err) {
+        console.warn(
+          "[useDeleteSoftware] Backend call failed — deleting locally:",
+          err,
+        );
+        deleteSoftwareLocally(id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["software"] });
