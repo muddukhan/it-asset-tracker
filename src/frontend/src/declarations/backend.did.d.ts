@@ -60,6 +60,14 @@ export interface AssetInput {
   'vendorName' : [] | [string],
   'photoId' : [] | [ExternalBlob],
 }
+export interface AssetStats {
+  'assigned' : bigint,
+  'total' : bigint,
+  'inStorage' : bigint,
+  'available' : bigint,
+  'inRepair' : bigint,
+  'retired' : bigint,
+}
 export type AssetStatus = { 'assigned' : null } |
   { 'inStorage' : null } |
   { 'available' : null } |
@@ -75,6 +83,12 @@ export interface AssignmentHistoryEntry {
   'timestamp' : Time,
   'assetName' : string,
   'fromAssignee' : [] | [string],
+}
+export interface DataMigrationInput {
+  'assets' : Array<AssetInput>,
+  'history' : Array<HistoryEntryInput>,
+  'software' : Array<StoreSoftwareInput>,
+  'users' : Array<LocalUserInput>,
 }
 export type ExternalBlob = Uint8Array;
 export interface FlexHistoryEntry {
@@ -200,8 +214,10 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'acceptDataMigration' : ActorMethod<[DataMigrationInput], MigrationStats>,
   'addAsset' : ActorMethod<[AssetInput], bigint>,
   'addAssetWithCreds' : ActorMethod<[string, string, AssetInput], bigint>,
+  'addFlexHistoryEntry' : ActorMethod<[HistoryEntryInput], bigint>,
   'addHistoryEntry' : ActorMethod<[HistoryEntryInput], bigint>,
   'addHistoryEntryWithCreds' : ActorMethod<
     [string, string, HistoryEntryInput],
@@ -236,17 +252,30 @@ export interface _SERVICE {
   'deleteSoftware' : ActorMethod<[bigint], undefined>,
   'deleteSoftwareWithCreds' : ActorMethod<[string, string, bigint], undefined>,
   'getAllAssets' : ActorMethod<[], Array<Asset>>,
+  'getAllAssetsWithCreds' : ActorMethod<[string, string], Array<Asset>>,
+  'getAllFlexHistory' : ActorMethod<[], Array<FlexHistoryEntry>>,
   'getAllLocalUsers' : ActorMethod<[], Array<LocalUser>>,
+  'getAllLocalUsersWithCreds' : ActorMethod<[string, string], Array<LocalUser>>,
   'getAllSoftware' : ActorMethod<[], Array<StoreSoftware>>,
+  'getAllSoftwareWithCreds' : ActorMethod<
+    [string, string],
+    Array<StoreSoftware>
+  >,
   'getAllUsersWithRoles' : ActorMethod<[], Array<UserWithRole>>,
   'getAsset' : ActorMethod<[bigint], Asset>,
+  'getAssetStats' : ActorMethod<[string, string], AssetStats>,
   'getAssetsByCategory' : ActorMethod<[AssetCategory], Array<Asset>>,
   'getAssetsByLocation' : ActorMethod<[string], Array<Asset>>,
   'getAssetsByStatus' : ActorMethod<[AssetStatus], Array<Asset>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getFlexHistory' : ActorMethod<[], Array<FlexHistoryEntry>>,
+  'getFlexHistoryByAsset' : ActorMethod<[bigint], Array<FlexHistoryEntry>>,
   'getFlexHistoryForAsset' : ActorMethod<[bigint], Array<FlexHistoryEntry>>,
+  'getFlexHistoryWithCreds' : ActorMethod<
+    [string, string],
+    Array<FlexHistoryEntry>
+  >,
   'getHistory' : ActorMethod<[], Array<AssignmentHistoryEntry>>,
   'getHistoryForAsset' : ActorMethod<[bigint], Array<AssignmentHistoryEntry>>,
   'getMigrationStats' : ActorMethod<[], MigrationStats>,
@@ -263,6 +292,10 @@ export interface _SERVICE {
     [] | [{ 'id' : bigint, 'accessLevel' : string, 'name' : string }]
   >,
   'markMigrationComplete' : ActorMethod<[], undefined>,
+  'migrateHistoryFromFrontend' : ActorMethod<
+    [Array<HistoryEntryInput>],
+    bigint
+  >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchAssets' : ActorMethod<[string], Array<Asset>>,
   'selfRegisterLocalUser' : ActorMethod<

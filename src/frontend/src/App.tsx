@@ -452,16 +452,7 @@ function AppShell() {
                 className="text-xs"
                 style={{ color: "oklch(var(--sidebar-foreground) / 0.4)" }}
               >
-                &copy; {new Date().getFullYear()}{" "}
-                <a
-                  href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                  style={{ color: "oklch(var(--sidebar-foreground) / 0.5)" }}
-                >
-                  caffeine.ai
-                </a>
+                &copy; {new Date().getFullYear()} Brandscapes Assets
               </p>
             </div>
           </aside>

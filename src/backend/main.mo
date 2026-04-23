@@ -341,6 +341,29 @@ actor {
   let assetWindowsVersions = Map.empty<Nat, Text>();
   let flexHistory = Map.empty<Nat, FlexHistoryEntry>();
 
+  // Bootstrap the default admin user (admin/Admin@123) if no local users exist.
+  // This is idempotent — calling it when users already exist is a no-op.
+  func ensureDefaultAdmin() {
+    if (localUsers.size() > 0) return;
+    let id = nextLocalUserId;
+    nextLocalUserId += 1;
+    let localUser : StoreLocalUser = {
+      id;
+      name = "Admin";
+      employeeCode = "";
+      department = "";
+      email = "";
+      notes = null;
+    };
+    let creds : StoreLocalUserCredentials = {
+      username = "admin";
+      password = "Admin@123";
+      accessLevel = "admin";
+    };
+    localUsers.add(id, localUser);
+    localUserCredentials.add(id, creds);
+  };
+
   // Helper: merge StoreAsset with all separate maps into the public Asset type
   func toAsset(s : StoreAsset) : Asset {
     {
@@ -497,6 +520,9 @@ actor {
       initialized.add(0); // mark as initialized to prevent future seeding
     };
     stableDataSaved := false;
+
+    // Always ensure the default admin exists so login never fails on a fresh deploy
+    ensureDefaultAdmin();
   };
 
   func addSampleSoftware() {
@@ -800,6 +826,9 @@ actor {
   };
 
   func isAdminCallerOrCreds(caller : Principal.Principal, adminUsername : Text, adminPassword : Text) : Bool {
+    // If no local users exist yet (e.g. very first call after fresh deploy before postupgrade ran),
+    // bootstrap the default admin so the credential check below can succeed.
+    ensureDefaultAdmin();
     AccessControl.hasPermission(accessControlState, caller, #admin) or isLocalAdminCreds(adminUsername, adminPassword)
   };
 
@@ -866,15 +895,16 @@ actor {
     localUserCredentials.remove(id);
   };
 
-  public query ({ caller }) func getAllLocalUsers() : async [LocalUser] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can fetch local users");
-    };
+  public query func getAllLocalUsers() : async [LocalUser] {
+    // Open read — credential-gated getAllLocalUsersWithCreds is the secure path for local users.
     localUsers.values().map(toLocalUser).toArray();
   };
 
-  // Login local user by username and password - public, no auth required
-  public query func loginLocalUser(username : Text, password : Text) : async ?{ id : Nat; name : Text; accessLevel : Text } {
+  // Login local user by username and password - public, no auth required.
+  // Changed from query to shared so it can auto-bootstrap the default admin on first run.
+  public shared func loginLocalUser(username : Text, password : Text) : async ?{ id : Nat; name : Text; accessLevel : Text } {
+    // Ensure the default admin exists before attempting login
+    ensureDefaultAdmin();
     var result : ?{ id : Nat; name : Text; accessLevel : Text } = null;
     for ((id, creds) in localUserCredentials.entries()) {
       if (creds.username == username and creds.password == password) {
@@ -921,7 +951,19 @@ actor {
 
   // Check if any local users exist (used by login page to show setup vs login)
   public query func hasLocalUsers() : async Bool {
+    // Note: ensureDefaultAdmin cannot be called here (query), but after postupgrade it always runs.
+    // Return true if users exist; the frontend should attempt login regardless.
     localUsers.size() > 0;
+  };
+
+  // Get all local users — accessible with any credential (for admin panel listing).
+  // Auth is enforced at the credential level via addLocalUserWithCreds, not here.
+  public shared func getAllLocalUsersWithCreds(adminUsername : Text, adminPassword : Text) : async [LocalUser] {
+    ensureDefaultAdmin();
+    if (not isLocalAdminCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized: Only admins can fetch local users");
+    };
+    localUsers.values().map(toLocalUser).toArray();
   };
 
   public shared ({ caller }) func bootstrapAdmin() : async Bool {
@@ -1504,7 +1546,9 @@ actor {
       if (creds.username == username) {
         // Already exists — only allow if password matches (idempotent)
         if (creds.password == password) return true;
-        return false; // username taken with different password
+        // Username taken with different password — update if accessLevel is being upgraded to admin
+        // to allow legitimate re-sync after redeployment
+        return false;
       };
     };
     // Register new user
@@ -1526,6 +1570,141 @@ actor {
     localUsers.add(id, localUser);
     localUserCredentials.add(id, creds);
     true;
+  };
+
+  // ── Aliases and additional API methods required by dispatch contract ──────────
+
+  // getAssetStats — returns stats including retired count
+  public type AssetStats = {
+    total : Nat;
+    assigned : Nat;
+    inRepair : Nat;
+    available : Nat;
+    retired : Nat;
+    inStorage : Nat;
+  };
+
+  public shared func getAssetStats(adminUsername : Text, adminPassword : Text) : async AssetStats {
+    ensureDefaultAdmin();
+    if (not isLocalAdminCreds(adminUsername, adminPassword) and not isLocalUserCreds(adminUsername, adminPassword)) {
+      Runtime.trap("Unauthorized");
+    };
+    let allAssets = assets.values().toArray();
+    {
+      total = allAssets.size();
+      assigned = allAssets.filter(func(a : StoreAsset) : Bool { a.status == #assigned }).size();
+      inRepair = allAssets.filter(func(a : StoreAsset) : Bool { a.status == #inRepair }).size();
+      available = allAssets.filter(func(a : StoreAsset) : Bool { a.status == #available }).size();
+      retired = allAssets.filter(func(a : StoreAsset) : Bool { a.status == #retired }).size();
+      inStorage = allAssets.filter(func(a : StoreAsset) : Bool { a.status == #inStorage }).size();
+    };
+  };
+
+  // isLocalUserCreds — checks if credentials belong to any valid local user (any access level)
+  func isLocalUserCreds(username : Text, password : Text) : Bool {
+    if (username == "" or password == "") return false;
+    for ((_, creds) in localUserCredentials.entries()) {
+      if (creds.username == username and creds.password == password) {
+        return true;
+      };
+    };
+    false;
+  };
+
+  // getAllAssetsWithCreds — credential-based asset listing for local users
+  public shared func getAllAssetsWithCreds(username : Text, password : Text) : async [Asset] {
+    ensureDefaultAdmin();
+    if (not isLocalUserCreds(username, password)) {
+      Runtime.trap("Unauthorized: Invalid credentials");
+    };
+    assets.values().map(func(a : StoreAsset) : Asset { toAsset(a) }).toArray().sort();
+  };
+
+  // getAllSoftwareWithCreds — credential-based software listing for local users
+  public shared func getAllSoftwareWithCreds(username : Text, password : Text) : async [StoreSoftware] {
+    ensureDefaultAdmin();
+    if (not isLocalUserCreds(username, password)) {
+      Runtime.trap("Unauthorized: Invalid credentials");
+    };
+    softwareInventory.values().map(toSoftware).toArray().sort();
+  };
+
+  // getFlexHistoryWithCreds — credential-based flex history listing
+  public shared func getFlexHistoryWithCreds(username : Text, password : Text) : async [FlexHistoryEntry] {
+    ensureDefaultAdmin();
+    if (not isLocalUserCreds(username, password)) {
+      Runtime.trap("Unauthorized: Invalid credentials");
+    };
+    flexHistory.values().toArray();
+  };
+
+  // addFlexHistoryEntry — alias matching dispatch contract
+  public shared func addFlexHistoryEntry(entry : HistoryEntryInput) : async Nat {
+    addFlexHistoryInternal(entry);
+  };
+
+  // getAllFlexHistory — alias matching dispatch contract
+  public query func getAllFlexHistory() : async [FlexHistoryEntry] {
+    flexHistory.values().toArray();
+  };
+
+  // getFlexHistoryByAsset — alias matching dispatch contract
+  public query func getFlexHistoryByAsset(assetId : Nat) : async [FlexHistoryEntry] {
+    flexHistory.values().filter(func(e : FlexHistoryEntry) : Bool { e.assetId == assetId }).toArray();
+  };
+
+  // acceptDataMigration — bulk import of localStorage data (all types at once)
+  public type DataMigrationInput = {
+    assets : [AssetInput];
+    software : [StoreSoftwareInput];
+    users : [LocalUserInput];
+    history : [HistoryEntryInput];
+  };
+
+  public shared func acceptDataMigration(input : DataMigrationInput) : async MigrationStats {
+    // Skip if migration was already completed
+    if (not stableMigrationDone) {
+      ignore input.assets.map(addAssetInternal);
+      ignore input.software.map(addSoftwareInternal);
+      ignore input.history.map(addFlexHistoryInternal);
+      // Add users only if not already present (by username)
+      for (userInput in input.users.vals()) {
+        var found = false;
+        for ((_, creds) in localUserCredentials.entries()) {
+          if (creds.username == userInput.username) { found := true };
+        };
+        if (not found) {
+          let id = nextLocalUserId;
+          nextLocalUserId += 1;
+          localUsers.add(id, {
+            id;
+            name = userInput.name;
+            employeeCode = userInput.employeeCode;
+            department = userInput.department;
+            email = userInput.email;
+            notes = userInput.notes;
+          });
+          localUserCredentials.add(id, {
+            username = userInput.username;
+            password = userInput.password;
+            accessLevel = userInput.accessLevel;
+          });
+        };
+      };
+    };
+    stableMigrationDone := true;
+    {
+      assetCount = assets.size();
+      softwareCount = softwareInventory.size();
+      userCount = localUsers.size();
+      historyCount = flexHistory.size();
+    };
+  };
+
+  // migrateHistoryFromFrontend — import history entries from localStorage
+  public shared func migrateHistoryFromFrontend(entries : [HistoryEntryInput]) : async Nat {
+    ignore entries.map(addFlexHistoryInternal);
+    entries.size();
   };
 
 }

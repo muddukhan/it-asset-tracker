@@ -76,26 +76,22 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
 
     setImporting(true);
 
-    // Pre-sync credentials ONCE before starting the import loop
+    // Pre-sync credentials ONCE before starting the import loop.
+    // If sync fails (backend unreachable), continue anyway — each addSoftware call
+    // has its own localStorage fallback so no rows are lost.
     try {
       const actor = await getActor();
-      const synced = await syncCredentialsToBackend(actor, {
+      await syncCredentialsToBackend(actor, {
         username: localSession.username,
         password: localSession.password,
         name: localSession.name,
         accessLevel: localSession.accessLevel,
       });
-      if (!synced) {
-        toast.error(
-          "Admin credentials not synced. Please log out and log in again.",
-        );
-        setImporting(false);
-        return;
-      }
     } catch {
-      toast.error("Could not connect to backend. Please try again.");
-      setImporting(false);
-      return;
+      // Backend unreachable — import will use localStorage fallback per row
+      console.warn(
+        "[SoftwareImport] Could not pre-sync credentials — will use localStorage fallback",
+      );
     }
 
     let success = 0;
@@ -117,6 +113,10 @@ export function SoftwareImportDialog({ open, onOpenChange }: Props) {
           notes: row.notes || undefined,
         });
         success++;
+        // Small delay between rows to avoid overwhelming the canister
+        if (i < rows.length - 1) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
       } catch (err) {
         console.error(`Row ${i + 1} import failed:`, err);
         failedRows.push(i + 1);

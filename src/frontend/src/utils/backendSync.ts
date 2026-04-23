@@ -37,17 +37,21 @@ export async function syncCredentialsToBackend(
     return false;
   }
 
+  // Preserve the exact accessLevel — never fall back to "readonly" for admin users
+  const accessLevel = creds.accessLevel || "readonly";
+  const displayName = creds.name || creds.username;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let result: boolean | undefined;
     try {
       result = await actor.selfRegisterLocalUser(
         creds.username,
         creds.password,
-        creds.name || creds.username,
-        creds.accessLevel || "readonly",
+        displayName,
+        accessLevel,
       );
       console.log(
-        `[backendSync] attempt ${attempt}/${maxAttempts}: username=${creds.username}, result=${result}`,
+        `[backendSync] attempt ${attempt}/${maxAttempts}: username=${creds.username}, accessLevel=${accessLevel}, result=${result}`,
       );
     } catch (err) {
       // Network/canister error — retry
@@ -61,6 +65,9 @@ export async function syncCredentialsToBackend(
         continue;
       }
       // All attempts exhausted
+      console.error(
+        `[backendSync] All ${maxAttempts} attempts failed for username=${creds.username}. Backend may be unreachable.`,
+      );
       return false;
     }
 

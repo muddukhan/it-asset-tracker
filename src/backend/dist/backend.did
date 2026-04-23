@@ -122,6 +122,13 @@ type FlexHistoryEntry =
    timestamp: int;
  };
 type ExternalBlob = blob;
+type DataMigrationInput = 
+ record {
+   assets: vec AssetInput;
+   history: vec HistoryEntryInput;
+   software: vec StoreSoftwareInput;
+   users: vec LocalUserInput;
+ };
 type AssignmentHistoryEntry = 
  record {
    assetId: nat;
@@ -141,6 +148,15 @@ type AssetStatus =
    inRepair;
    inStorage;
    retired;
+ };
+type AssetStats = 
+ record {
+   assigned: nat;
+   available: nat;
+   inRepair: nat;
+   inStorage: nat;
+   retired: nat;
+   total: nat;
  };
 type AssetInput = 
  record {
@@ -207,9 +223,11 @@ service : {
    opt _CaffeineStorageRefillInformation) -> (_CaffeineStorageRefillResult);
   _caffeineStorageUpdateGatewayPrincipals: () -> ();
   _initializeAccessControlWithSecret: (userSecret: text) -> ();
+  acceptDataMigration: (input: DataMigrationInput) -> (MigrationStats);
   addAsset: (input: AssetInput) -> (nat);
   addAssetWithCreds: (adminUsername: text, adminPassword: text, input:
    AssetInput) -> (nat);
+  addFlexHistoryEntry: (entry: HistoryEntryInput) -> (nat);
   addHistoryEntry: (entry: HistoryEntryInput) -> (nat);
   addHistoryEntryWithCreds: (adminUsername: text, adminPassword: text, entry:
    HistoryEntryInput) -> (nat);
@@ -241,17 +259,27 @@ service : {
   deleteSoftwareWithCreds: (adminUsername: text, adminPassword: text, id:
    nat) -> ();
   getAllAssets: () -> (vec Asset) query;
+  getAllAssetsWithCreds: (username: text, password: text) -> (vec Asset);
+  getAllFlexHistory: () -> (vec FlexHistoryEntry) query;
   getAllLocalUsers: () -> (vec LocalUser) query;
+  getAllLocalUsersWithCreds: (adminUsername: text, adminPassword: text) ->
+   (vec LocalUser);
   getAllSoftware: () -> (vec StoreSoftware) query;
+  getAllSoftwareWithCreds: (username: text, password: text) ->
+   (vec StoreSoftware);
   getAllUsersWithRoles: () -> (vec UserWithRole) query;
   getAsset: (id: nat) -> (Asset) query;
+  getAssetStats: (adminUsername: text, adminPassword: text) -> (AssetStats);
   getAssetsByCategory: (category: AssetCategory) -> (vec Asset) query;
   getAssetsByLocation: (location: text) -> (vec Asset) query;
   getAssetsByStatus: (status: AssetStatus) -> (vec Asset) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
   getFlexHistory: () -> (vec FlexHistoryEntry) query;
+  getFlexHistoryByAsset: (assetId: nat) -> (vec FlexHistoryEntry) query;
   getFlexHistoryForAsset: (assetId: nat) -> (vec FlexHistoryEntry) query;
+  getFlexHistoryWithCreds: (username: text, password: text) ->
+   (vec FlexHistoryEntry);
   getHistory: () -> (vec AssignmentHistoryEntry) query;
   getHistoryForAsset: (assetId: nat) -> (vec AssignmentHistoryEntry) query;
   getMigrationStats: () -> (MigrationStats) query;
@@ -269,8 +297,9 @@ service : {
           accessLevel: text;
           id: nat;
           name: text;
-        }) query;
+        });
   markMigrationComplete: () -> ();
+  migrateHistoryFromFrontend: (entries: vec HistoryEntryInput) -> (nat);
   saveCallerUserProfile: (profile: UserProfile) -> ();
   searchAssets: (term: text) -> (vec Asset) query;
   selfRegisterLocalUser: (username: text, password: text, name: text,

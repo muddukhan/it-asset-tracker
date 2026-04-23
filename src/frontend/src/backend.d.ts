@@ -20,6 +20,12 @@ export interface WarrantyStats {
     active: bigint;
     expired: bigint;
 }
+export interface DataMigrationInput {
+    assets: Array<AssetInput>;
+    history: Array<HistoryEntryInput>;
+    software: Array<StoreSoftwareInput>;
+    users: Array<LocalUserInput>;
+}
 export type Time = bigint;
 export interface UserWithRole {
     principal: Principal;
@@ -162,6 +168,14 @@ export interface StoreSoftware {
     assetTag?: string;
     licenseExpiry?: string;
 }
+export interface AssetStats {
+    assigned: bigint;
+    total: bigint;
+    inStorage: bigint;
+    available: bigint;
+    inRepair: bigint;
+    retired: bigint;
+}
 export interface UserProfile {
     name: string;
 }
@@ -187,8 +201,10 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
+    acceptDataMigration(input: DataMigrationInput): Promise<MigrationStats>;
     addAsset(input: AssetInput): Promise<bigint>;
     addAssetWithCreds(adminUsername: string, adminPassword: string, input: AssetInput): Promise<bigint>;
+    addFlexHistoryEntry(entry: HistoryEntryInput): Promise<bigint>;
     addHistoryEntry(entry: HistoryEntryInput): Promise<bigint>;
     addHistoryEntryWithCreds(adminUsername: string, adminPassword: string, entry: HistoryEntryInput): Promise<bigint>;
     addLocalUser(input: LocalUserInput): Promise<bigint>;
@@ -216,17 +232,24 @@ export interface backendInterface {
     deleteSoftware(id: bigint): Promise<void>;
     deleteSoftwareWithCreds(adminUsername: string, adminPassword: string, id: bigint): Promise<void>;
     getAllAssets(): Promise<Array<Asset>>;
+    getAllAssetsWithCreds(username: string, password: string): Promise<Array<Asset>>;
+    getAllFlexHistory(): Promise<Array<FlexHistoryEntry>>;
     getAllLocalUsers(): Promise<Array<LocalUser>>;
+    getAllLocalUsersWithCreds(adminUsername: string, adminPassword: string): Promise<Array<LocalUser>>;
     getAllSoftware(): Promise<Array<StoreSoftware>>;
+    getAllSoftwareWithCreds(username: string, password: string): Promise<Array<StoreSoftware>>;
     getAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     getAsset(id: bigint): Promise<Asset>;
+    getAssetStats(adminUsername: string, adminPassword: string): Promise<AssetStats>;
     getAssetsByCategory(category: AssetCategory): Promise<Array<Asset>>;
     getAssetsByLocation(location: string): Promise<Array<Asset>>;
     getAssetsByStatus(status: AssetStatus): Promise<Array<Asset>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFlexHistory(): Promise<Array<FlexHistoryEntry>>;
+    getFlexHistoryByAsset(assetId: bigint): Promise<Array<FlexHistoryEntry>>;
     getFlexHistoryForAsset(assetId: bigint): Promise<Array<FlexHistoryEntry>>;
+    getFlexHistoryWithCreds(username: string, password: string): Promise<Array<FlexHistoryEntry>>;
     getHistory(): Promise<Array<AssignmentHistoryEntry>>;
     getHistoryForAsset(assetId: bigint): Promise<Array<AssignmentHistoryEntry>>;
     getMigrationStats(): Promise<MigrationStats>;
@@ -244,6 +267,7 @@ export interface backendInterface {
         name: string;
     } | null>;
     markMigrationComplete(): Promise<void>;
+    migrateHistoryFromFrontend(entries: Array<HistoryEntryInput>): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchAssets(term: string): Promise<Array<Asset>>;
     selfRegisterLocalUser(username: string, password: string, name: string, accessLevel: string): Promise<boolean>;

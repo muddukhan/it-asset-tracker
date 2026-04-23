@@ -63,9 +63,10 @@ async function resolveCanisterId(): Promise<string> {
 let _cachedActor: Backend | null = null;
 let _cachedCanisterId: string | null = null;
 
-/** Clear the cached actor so the next call to getActorWithRetry() starts fresh */
+/** Clear the cached actor AND canister ID so the next call to getActorWithRetry() starts fresh */
 export function resetActor(): void {
   _cachedActor = null;
+  _cachedCanisterId = null;
 }
 
 async function createActor(): Promise<Backend> {

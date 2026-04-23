@@ -160,8 +160,6 @@ export function InventoryPage({
     }
   }, [initialAssetId, assets, autoOpenDone]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: addModalOpen triggers refresh after modal close
-
   // Derive unique processor and RAM values from assets for filter dropdowns
   const processorOptions = useMemo(() => {
     if (!assets) return [];
