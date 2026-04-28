@@ -42,7 +42,10 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SoftwareInventoryPage } from "./pages/SoftwareInventoryPage";
-import { syncCredentialsToBackend } from "./utils/backendSync";
+import {
+  setCredSyncPromise,
+  syncCredentialsToBackend,
+} from "./utils/backendSync";
 
 const queryClient = new QueryClient();
 
@@ -107,14 +110,14 @@ function AppShell() {
   // On app startup: always silently re-sync credentials to the backend.
   // This ensures that after a canister redeployment (which wipes backend state),
   // the user's credentials are re-registered before any mutation is attempted.
-  // Fire-and-forget is intentional here — we don't block app startup on this.
+  // We publish the promise via setCredSyncPromise so mutations can await it.
   const _startupUsername = localSession?.username ?? "";
   const _startupPassword = localSession?.password ?? "";
   const _startupName = localSession?.name ?? "";
   const _startupAccessLevel = localSession?.accessLevel ?? "";
   useEffect(() => {
     if (_startupUsername && _startupPassword) {
-      getActor()
+      const syncPromise = getActor()
         .then((actor) =>
           syncCredentialsToBackend(actor, {
             username: _startupUsername,
@@ -125,8 +128,11 @@ function AppShell() {
         )
         .then((ok) => {
           if (ok) localStorage.removeItem("pendingBackendSync");
+          return ok;
         })
-        .catch(() => {});
+        .catch(() => false);
+      // Publish so mutations can await sync completion before firing
+      setCredSyncPromise(syncPromise);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_startupUsername, _startupPassword, _startupName, _startupAccessLevel]);

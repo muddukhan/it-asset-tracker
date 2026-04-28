@@ -9,7 +9,7 @@ import type {
   LocalUserInput,
 } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
-import { syncCredentialsToBackend } from "../utils/backendSync";
+import { awaitCredSync, syncCredentialsToBackend } from "../utils/backendSync";
 import type {
   LocalAsset,
   LocalAssetInput,
@@ -97,7 +97,7 @@ async function ensureActor(currentActor: import("../backend").Backend | null) {
   if (currentActor) return currentActor;
   console.warn("[useQueries] Actor is null — resetting cache and retrying…");
   resetActor();
-  return getActorWithRetry(3);
+  return getActorWithRetry(5);
 }
 
 /**
@@ -131,7 +131,7 @@ async function withCredRetry<T>(
       "[useQueries] Auth error on first attempt — resetting actor and re-syncing credentials for retry",
     );
     resetActor();
-    const freshActor = await getActorWithRetry(3);
+    const freshActor = await getActorWithRetry(5);
     await syncCredentialsToBackend(freshActor, creds).catch(() => {});
     return await fn(freshActor);
   }
@@ -465,6 +465,9 @@ export function useAddAsset() {
           "Session expired — please log out and log back in to continue.",
         );
 
+      // Await startup credential sync so this mutation isn't blocked by a race condition
+      await awaitCredSync().catch(() => {});
+
       let photoDataUrl: string | undefined = input.photoDataUrl;
       if (input.photoFile) {
         photoDataUrl = await fileToBase64(input.photoFile);
@@ -478,7 +481,7 @@ export function useAddAsset() {
         return;
       }
 
-      // Re-sync credentials before mutation (non-blocking)
+      // Re-sync credentials before mutation (ensures backend has the creds)
       await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
@@ -675,7 +678,11 @@ export function useAddLocalUser() {
           "Session expired — please log out and log back in to continue.",
         );
 
+      // Await startup credential sync (eliminate race condition)
+      await awaitCredSync().catch(() => {});
+
       // Always save to local registry first so the new user can log in
+      // even if the backend call fails or the canister is redeployed later.
       saveUserToRegistry({
         userId: input.username,
         password: input.password,
@@ -689,7 +696,9 @@ export function useAddLocalUser() {
         return;
       }
 
-      // Re-sync admin credentials before adding user (non-blocking)
+      // Re-sync CURRENT admin credentials before adding user.
+      // This is the key fix: we sync the ADMIN's creds (not the new user's creds)
+      // so the backend recognizes us as authorized to call addLocalUserWithCreds.
       await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,
@@ -714,10 +723,13 @@ export function useAddLocalUser() {
         );
       } catch (err) {
         console.warn(
-          "[useAddLocalUser] Backend call failed — saved to local registry:",
+          "[useAddLocalUser] Backend call failed — user saved to local registry:",
           err,
         );
+        // User is already in localStorage registry (done above), so they CAN log in.
+        // Show a softer message rather than exposing the raw error.
         addUserLocally(input);
+        return; // Don't re-throw — the save succeeded locally
       }
 
       // Also sync the new user's credentials so they can use WithCreds operations

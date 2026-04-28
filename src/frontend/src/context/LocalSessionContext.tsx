@@ -1,8 +1,9 @@
 import { createContext, useContext, useState } from "react";
 
 // ── Session shape ─────────────────────────────────────────────────────────────
-// username/name/accessLevel/password are all persisted in localStorage.
-// sessionStorage is also written as a secondary copy (faster read in same tab).
+// username/name/accessLevel/password are all persisted across tabs and refreshes.
+// localStorage is the primary store (survives tab close/reopen).
+// sessionStorage is a secondary copy for same-tab fast reads.
 
 export interface LocalSession {
   name: string;
@@ -69,6 +70,13 @@ const SESSION_KEY = "localUserSession";
 const SESSION_PWD_KEY = "session_password"; // localStorage key (persists tab close)
 const SESSION_PWD_SS_KEY = "localSessionPwd"; // sessionStorage key (legacy compat)
 
+/**
+ * Module-level in-memory cache for the session password.
+ * Provides a last-resort fallback if both localStorage and sessionStorage
+ * return empty (e.g. private browsing mode or storage quota exceeded).
+ */
+let _inMemoryPassword = "";
+
 export function persistSession(session: LocalSession): void {
   const persisted: PersistedSession = {
     username: session.username,
@@ -77,14 +85,17 @@ export function persistSession(session: LocalSession): void {
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(persisted));
 
-  // Store password in BOTH localStorage (survives tab close) and sessionStorage (fast read)
+  // ALWAYS write password to BOTH storages — never skip either.
+  // localStorage survives tab close; sessionStorage is fast for same-tab reads.
   if (session.password) {
+    _inMemoryPassword = session.password;
     localStorage.setItem(SESSION_PWD_KEY, session.password);
     sessionStorage.setItem(SESSION_PWD_SS_KEY, session.password);
   }
 }
 
 export function clearPersistedSession(): void {
+  _inMemoryPassword = "";
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_PWD_KEY);
   sessionStorage.removeItem(SESSION_PWD_SS_KEY);
@@ -102,13 +113,25 @@ export function loadPersistedSession(): PersistedSession | null {
 }
 
 /**
- * Load the persisted password, checking sessionStorage first (faster),
- * then falling back to localStorage (survives tab close).
+ * Load the persisted password.
+ * Priority: in-memory cache → localStorage (most persistent) → sessionStorage
+ * localStorage is checked first because it survives tab close and is the
+ * canonical store. sessionStorage is a fallback for the same-tab case.
  */
 export function loadSessionPassword(): string {
-  return (
-    sessionStorage.getItem(SESSION_PWD_SS_KEY) ??
-    localStorage.getItem(SESSION_PWD_KEY) ??
-    ""
-  );
+  // 1. In-memory cache (fastest, safest)
+  if (_inMemoryPassword) return _inMemoryPassword;
+  // 2. localStorage (survives tab close)
+  const lsPassword = localStorage.getItem(SESSION_PWD_KEY);
+  if (lsPassword) {
+    _inMemoryPassword = lsPassword; // warm cache
+    return lsPassword;
+  }
+  // 3. sessionStorage (legacy fallback)
+  const ssPassword = sessionStorage.getItem(SESSION_PWD_SS_KEY);
+  if (ssPassword) {
+    _inMemoryPassword = ssPassword; // warm cache
+    return ssPassword;
+  }
+  return "";
 }

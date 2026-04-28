@@ -7,7 +7,10 @@ import { useState } from "react";
 import type { LocalSession } from "../context/LocalSessionContext";
 import { persistSession } from "../context/LocalSessionContext";
 import { getActor } from "../hooks/useActor";
-import { syncCredentialsToBackend } from "../utils/backendSync";
+import {
+  setCredSyncPromise,
+  syncCredentialsToBackend,
+} from "../utils/backendSync";
 import { runMigrationIfNeeded } from "../utils/localDB";
 
 // ── Shared users.json type ─────────────────────────────────────────────────────
@@ -130,6 +133,8 @@ export function LoginPage({
         };
         persistSession(session);
         localStorage.removeItem("pendingBackendSync");
+        // Backend already validated creds — publish resolved promise so mutations don't wait
+        setCredSyncPromise(Promise.resolve(true));
         // Background migration — don't block login
         getActor()
           .then((actor) => runMigrationIfNeeded(actor))
@@ -178,17 +183,26 @@ export function LoginPage({
       }
 
       // ── Step 4: Sync credentials to backend ONLY if backend is available ──────
-      // If backend was unreachable, skip sync entirely — we still allow login.
-      // This is the key fix: don't attempt a sync that will time out and fail.
+      // We AWAIT this sync (max 3 seconds) before redirecting so that the first
+      // mutation fired after login finds credentials already registered.
       if (backendAvailable) {
         try {
           const actor = await getActor();
-          const syncOk = await syncCredentialsToBackend(actor, {
+          // Wrap in a race against a 3-second timeout so login doesn't hang
+          const syncPromise = syncCredentialsToBackend(actor, {
             username: foundUser.userId,
             password: passwordClean,
             name: foundUser.name,
             accessLevel: foundUser.accessLevel,
           });
+          // Publish promise so App.tsx startup sync doesn't overwrite it
+          setCredSyncPromise(syncPromise);
+          const syncOk = await Promise.race([
+            syncPromise,
+            new Promise<boolean>((resolve) =>
+              setTimeout(() => resolve(false), 3000),
+            ),
+          ]);
           console.log("[LoginPage] syncCredentialsToBackend result:", syncOk);
           if (!syncOk) {
             localStorage.setItem("pendingBackendSync", "1");
@@ -201,6 +215,7 @@ export function LoginPage({
             syncErr,
           );
           localStorage.setItem("pendingBackendSync", "1");
+          setCredSyncPromise(Promise.resolve(false));
         }
       } else {
         // Backend unreachable — mark as pending sync for next startup
@@ -208,6 +223,7 @@ export function LoginPage({
           "[LoginPage] Backend unavailable — skipping sync, flagging for retry",
         );
         localStorage.setItem("pendingBackendSync", "1");
+        setCredSyncPromise(Promise.resolve(false));
       }
 
       // ── Step 5: Create session ────────────────────────────────────────────────

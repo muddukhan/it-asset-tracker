@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { StoreSoftware, StoreSoftwareInput } from "../backend";
 import { useLocalSession } from "../context/LocalSessionContext";
-import { syncCredentialsToBackend } from "../utils/backendSync";
+import { awaitCredSync, syncCredentialsToBackend } from "../utils/backendSync";
 import type { LocalSoftware, LocalSoftwareInput } from "../utils/localDB";
 import { getActorWithRetry, resetActor, useActor } from "./useActor";
 
@@ -67,7 +67,7 @@ async function ensureActor(currentActor: import("../backend").Backend | null) {
     "[useSoftwareQueries] Actor is null — resetting cache and retrying…",
   );
   resetActor();
-  return getActorWithRetry(3);
+  return getActorWithRetry(5);
 }
 
 /**
@@ -99,7 +99,7 @@ async function withCredRetry<T>(
       "[useSoftwareQueries] Auth error — resetting actor and re-syncing for retry",
     );
     resetActor();
-    const freshActor = await getActorWithRetry(3);
+    const freshActor = await getActorWithRetry(5);
     await syncCredentialsToBackend(freshActor, creds).catch(() => {});
     return await fn(freshActor);
   }
@@ -178,13 +178,16 @@ export function useAddSoftware() {
           "Session expired — please log out and log back in to continue.",
         );
 
+      // Await startup credential sync (eliminates race condition after login)
+      await awaitCredSync().catch(() => {});
+
       const resolvedActor = await ensureActor(actor).catch(() => null);
       if (!resolvedActor) {
         addSoftwareLocally(input);
         return;
       }
 
-      // Re-sync credentials before mutation (non-blocking)
+      // Re-sync credentials before mutation (ensures backend has the creds)
       await syncCredentialsToBackend(resolvedActor, {
         username: creds.username,
         password: creds.password,

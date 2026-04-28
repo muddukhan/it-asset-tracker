@@ -15,7 +15,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
   }
 });
 var _disableTimeVerification, _agent, _inner, _expirationTime, _rawKey, _derKey, _currentInterval, _randomizationFactor, _multiplier, _maxInterval, _startTime, _maxElapsedTime, _maxIterations, _date, _count, _rootKeyPromise, _shouldFetchRootKey, _timeDiffMsecs, _hasSyncedTime, _syncTimePromise, _shouldSyncTime, _identity, _fetch, _fetchOptions, _callOptions, _credentials, _retryTimes, _backoffStrategy, _maxIngressExpiryInMinutes, _HttpAgent_instances, maxIngressExpiryInMs_get, _queryPipeline, _updatePipeline, _subnetKeys, _verifyQuerySignatures, requestAndRetryQuery_fn, requestAndRetry_fn, _verifyQueryResponse, asyncGuard_fn, rootKeyGuard_fn, syncTimeGuard_fn;
-import { b as bytesToHex, c as compare, a as concatBytes, s as sha256, l as lebEncode, P as Principal, d as abytes, h as hexToBytes, i as isBytes, e as anumber, u as utf8ToBytes, r as randomBytes, f as lebDecode, g as PipeArrayBuffer, j as sha512, I as IDL, k as encode$1, m as decode$1 } from "./index-BAoAKycB.js";
+import { b as bytesToHex, c as compare, a as concatBytes, s as sha256, l as lebEncode, P as Principal, d as abytes, h as hexToBytes, i as isBytes, e as anumber, u as utf8ToBytes, r as randomBytes, f as lebDecode, g as PipeArrayBuffer, j as sha512, I as IDL, k as encode$1, m as decode$1 } from "./index-XdRyqcfO.js";
 var ReplicaRejectCode;
 (function(ReplicaRejectCode2) {
   ReplicaRejectCode2[ReplicaRejectCode2["SysFatal"] = 1] = "SysFatal";

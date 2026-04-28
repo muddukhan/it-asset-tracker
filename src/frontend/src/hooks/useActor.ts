@@ -3,42 +3,54 @@ import { useEffect, useRef, useState } from "react";
 import { Backend } from "../backend";
 
 /**
- * Resolve the backend canister ID at runtime via multiple strategies:
- * 1. env.json (injected at build time by canister.yaml, served as a static asset)
- * 2. window.__CANISTER_ID_BACKEND__ (injected by platform runtime)
- * 3. import.meta.env.VITE_CANISTER_ID_BACKEND (Vite build-time env — may be empty)
- * 4. process.env.CANISTER_ID_BACKEND (non-Vite env fallback)
+ * Resolve the backend canister ID at runtime via multiple strategies.
+ * CRITICAL ORDER:
+ * 1. window.__CANISTER_ID_BACKEND__ — platform injects this at runtime (MUST be first)
+ * 2. env.json — static file served with app (only if value is not 'undefined' string or empty)
+ * 3. import.meta.env.VITE_CANISTER_ID_BACKEND — Vite build-time env
+ * 4. process.env.CANISTER_ID_BACKEND — non-Vite env fallback
  */
 async function resolveCanisterId(): Promise<string> {
-  // Strategy 1: env.json (most reliable — set by canister.yaml at deploy time)
+  // Strategy 1: window global injected by platform runtime (HIGHEST PRIORITY)
+  // The platform injects window.__CANISTER_ID_BACKEND__ at request time.
+  // This MUST be checked before env.json because env.json may contain the
+  // literal string "undefined" if the canister wasn't deployed yet at build time.
+  const globalId =
+    (globalThis as Record<string, unknown>).__CANISTER_ID_BACKEND__ ??
+    (globalThis as Record<string, unknown>).__CANISTER_IDS__?.backend;
+  if (
+    typeof globalId === "string" &&
+    globalId.length > 0 &&
+    globalId !== "undefined"
+  ) {
+    console.log("[useActor] ✓ Canister ID from window global:", globalId);
+    return globalId;
+  }
+
+  // Strategy 2: env.json (injected at deploy time by canister.yaml)
+  // Only use if the value is a real canister ID, not the string "undefined" or empty.
   try {
     const res = await fetch("/env.json", { cache: "no-store" });
     if (res.ok) {
       const data = (await res.json()) as { backend_canister_id?: string };
       const id = data.backend_canister_id;
-      if (id && id !== "undefined" && id.length > 0) {
-        console.log("[useActor] Canister ID from env.json:", id);
+      if (id && id !== "undefined" && id !== "null" && id.trim().length > 0) {
+        console.log("[useActor] ✓ Canister ID from env.json:", id);
         return id;
       }
+      console.warn(
+        "[useActor] env.json backend_canister_id is empty or 'undefined' — skipping (platform will inject via window global)",
+      );
     }
   } catch {
-    // Ignore — try next strategy
-  }
-
-  // Strategy 2: window global injected by platform
-  const globalId =
-    (globalThis as Record<string, unknown>).__CANISTER_ID_BACKEND__ ??
-    (globalThis as Record<string, unknown>).__CANISTER_IDS__?.backend;
-  if (typeof globalId === "string" && globalId.length > 0) {
-    console.log("[useActor] Canister ID from window global:", globalId);
-    return globalId;
+    console.warn("[useActor] Could not fetch env.json — trying next strategy");
   }
 
   // Strategy 3: Vite build-time env (may be empty if not set at build time)
   const viteId = (import.meta as { env: Record<string, string> }).env
     ?.VITE_CANISTER_ID_BACKEND;
-  if (viteId && viteId.length > 0) {
-    console.log("[useActor] Canister ID from VITE env:", viteId);
+  if (viteId && viteId.length > 0 && viteId !== "undefined") {
+    console.log("[useActor] ✓ Canister ID from VITE env:", viteId);
     return viteId;
   }
 
@@ -47,15 +59,13 @@ async function resolveCanisterId(): Promise<string> {
     typeof process !== "undefined"
       ? (process.env as Record<string, string>)?.CANISTER_ID_BACKEND
       : undefined;
-  if (processId && processId.length > 0) {
-    console.log("[useActor] Canister ID from process.env:", processId);
+  if (processId && processId.length > 0 && processId !== "undefined") {
+    console.log("[useActor] ✓ Canister ID from process.env:", processId);
     return processId;
   }
 
   console.error(
-    "[useActor] CANISTER_ID could not be resolved from any source. " +
-      "env.json backend_canister_id was empty or undefined. " +
-      "Backend calls will fail until a valid canister ID is available.",
+    `[useActor] ✗ CANISTER_ID could not be resolved from any strategy.\n  window.__CANISTER_ID_BACKEND__ = ${String(globalId)}\n  env.json may have backend_canister_id='undefined'\n  Backend calls will fail. The app will use localStorage fallback.`,
   );
   return "";
 }
@@ -81,7 +91,7 @@ async function createActor(): Promise<Backend> {
   if (!canisterId) {
     throw new Error(
       "Canister ID is not configured. The app cannot connect to the backend. " +
-        "Please ensure the app is deployed correctly and env.json contains a valid backend_canister_id.",
+        "Please ensure the app is deployed correctly.",
     );
   }
 
@@ -124,15 +134,19 @@ async function createActor(): Promise<Backend> {
     ) => Backend
   )(rawActor, uploadFile, downloadFile);
 
+  console.log(
+    "[useActor] ✓ Actor created successfully for canister:",
+    canisterId,
+  );
   return _cachedActor;
 }
 
 /**
  * Attempt to create the actor with up to `maxAttempts` retries.
- * Each retry is separated by a 1-second delay.
- * Returns the actor on success, or throws after all attempts are exhausted.
+ * Retries use exponential backoff: 500ms, 1000ms, 1500ms, 2000ms...
+ * On each retry the canister ID is re-resolved (window global may be available later).
  */
-export async function getActorWithRetry(maxAttempts = 3): Promise<Backend> {
+export async function getActorWithRetry(maxAttempts = 5): Promise<Backend> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -145,10 +159,11 @@ export async function getActorWithRetry(maxAttempts = 3): Promise<Backend> {
         err,
       );
       if (attempt < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        // Clear cache so next attempt starts fresh
+        const delay = 500 * attempt; // 500ms, 1000ms, 1500ms, 2000ms
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        // Clear cache so next attempt re-resolves canister ID (window global may be ready)
         _cachedActor = null;
-        _cachedCanisterId = null; // Re-resolve canister ID on retry (env.json may have loaded)
+        _cachedCanisterId = null;
       }
     }
   }
@@ -167,7 +182,7 @@ export function useActor(): { actor: Backend | null; isFetching: boolean } {
       setIsFetching(false);
       return;
     }
-    getActorWithRetry(3)
+    getActorWithRetry(5)
       .then((a) => {
         if (mountedRef.current) {
           setActor(a);
@@ -188,5 +203,5 @@ export function useActor(): { actor: Backend | null; isFetching: boolean } {
 
 /** Synchronous getter used in imperative migration code */
 export async function getActor(): Promise<Backend> {
-  return getActorWithRetry(3);
+  return getActorWithRetry(5);
 }
