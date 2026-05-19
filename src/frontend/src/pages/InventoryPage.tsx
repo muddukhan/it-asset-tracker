@@ -347,6 +347,7 @@ export function InventoryPage({
                   "Printer",
                   "Server",
                   "Network",
+                  "Peripheral",
                   "Other",
                 ].map((c) => (
                   <SelectItem key={c} value={c}>

@@ -47,6 +47,7 @@ const CATEGORY_MAP: Record<string, string> = {
   monitor: "Monitor",
   printer: "Printer",
   server: "Server",
+  peripheral: "Peripheral",
   other: "Other",
 };
 

@@ -60,6 +60,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   Monitor: <Monitor className="h-5 w-5" />,
   Server: <Server className="h-5 w-5" />,
   Printer: <Printer className="h-5 w-5" />,
+  Peripheral: <Package className="h-5 w-5" />,
   Other: <HardDrive className="h-5 w-5" />,
 };
 
@@ -69,6 +70,7 @@ const categorySmallIcons: Record<string, React.ReactNode> = {
   Monitor: <Monitor className="h-4 w-4" />,
   Server: <Server className="h-4 w-4" />,
   Printer: <Printer className="h-4 w-4" />,
+  Peripheral: <Package className="h-4 w-4" />,
   Other: <HardDrive className="h-4 w-4" />,
 };
 

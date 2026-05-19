@@ -30133,7 +30133,7 @@ async function createActor() {
   const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
   const host = isLocal ? "http://127.0.0.1:4943" : "https://icp-api.io";
   const { HttpAgent, Actor } = await __vitePreload(async () => {
-    const { HttpAgent: HttpAgent2, Actor: Actor2 } = await import("./index-C6oRAukD.js");
+    const { HttpAgent: HttpAgent2, Actor: Actor2 } = await import("./index-C71FI7I0.js");
     return { HttpAgent: HttpAgent2, Actor: Actor2 };
   }, true ? [] : void 0);
   const { idlFactory: idlFactory2 } = await __vitePreload(async () => {
@@ -42048,10 +42048,10 @@ function AdminPage({
   const { data: isAdminFromChain, isLoading: adminLoading } = useIsCallerAdmin();
   const isLocalAdmin = (localSession == null ? void 0 : localSession.accessLevel) === "admin";
   const isAdmin = isLocalAdmin || isAdminFromChain;
-  const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
+  const { data: assets } = useGetAllAssets();
   const { data: usersWithRoles, isLoading: usersLoading } = useGetAllUsersWithRoles(isAdmin ?? false);
   const { data: localUsers, isLoading: localUsersLoading } = useGetAllLocalUsers();
-  const assignRole = useAssignUserRole();
+  useAssignUserRole();
   const bootstrapAdmin = useBootstrapAdmin();
   const { identity } = useInternetIdentity();
   const [principalInput, setPrincipalInput] = reactExports.useState("");
@@ -42073,27 +42073,6 @@ function AdminPage({
       )
     );
   }
-  const handleAssignRole = async () => {
-    const trimmed = principalInput.trim();
-    if (!trimmed) {
-      ue.error("Please enter a principal ID");
-      return;
-    }
-    let principal;
-    try {
-      principal = Principal$2.fromText(trimmed);
-    } catch {
-      ue.error("Invalid principal ID format");
-      return;
-    }
-    try {
-      await assignRole.mutateAsync({ user: principal, role: selectedRole });
-      ue.success(`Role "${selectedRole}" assigned successfully`);
-      setPrincipalInput("");
-    } catch {
-      ue.error("Failed to assign role");
-    }
-  };
   const handleBootstrapAdmin = async () => {
     try {
       await bootstrapAdmin.mutateAsync();
@@ -42103,14 +42082,6 @@ function AdminPage({
     } catch {
       ue.error("Failed to assign admin role");
     }
-  };
-  const handleFillMyPrincipal = () => {
-    if (!myPrincipal) {
-      ue.error("Please sign in first");
-      return;
-    }
-    setPrincipalInput(myPrincipal);
-    setSelectedRole(UserRole.admin);
   };
   if (adminLoading && !isLocalAdmin) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-6", children: [
@@ -42249,192 +42220,6 @@ function AdminPage({
           className: "text-sm mt-0.5",
           style: { color: "oklch(var(--muted-foreground))" },
           children: "User role management and asset allocation overview"
-        }
-      )
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        motion.div,
-        {
-          initial: { opacity: 0, y: 12 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.35 },
-          className: "rounded-xl border shadow-card p-6",
-          style: {
-            backgroundColor: "oklch(var(--card))",
-            borderColor: "oklch(var(--border))"
-          },
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-semibold text-base text-foreground mb-1", children: "Assign User Role" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "p",
-              {
-                className: "text-xs mb-4",
-                style: { color: "oklch(var(--muted-foreground))" },
-                children: "Grant or change a user's access level by their principal ID"
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              Button,
-              {
-                variant: "outline",
-                size: "sm",
-                onClick: handleFillMyPrincipal,
-                disabled: !myPrincipal,
-                className: "w-full mb-5 border-dashed",
-                style: {
-                  borderColor: "oklch(var(--accent) / 0.5)",
-                  color: "oklch(var(--accent))"
-                },
-                "data-ocid": "admin.secondary_button",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { className: "h-3.5 w-3.5 mr-1.5" }),
-                  "Fill My Principal"
-                ]
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-4", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1.5", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "principal-input", children: "Principal ID" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  Input,
-                  {
-                    id: "principal-input",
-                    placeholder: "e.g. aaaaa-aa",
-                    value: principalInput,
-                    onChange: (e) => setPrincipalInput(e.target.value),
-                    "data-ocid": "admin.input"
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-muted-foreground", children: 'Tip: Click "Fill My Principal" above to auto-fill your own principal ID.' })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1.5", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "role-select", children: "Role" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                  Select,
-                  {
-                    value: selectedRole,
-                    onValueChange: (v2) => setSelectedRole(v2),
-                    children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(SelectTrigger, { id: "role-select", "data-ocid": "admin.select", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: "Select role" }) }),
-                      /* @__PURE__ */ jsxRuntimeExports.jsxs(SelectContent, { children: [
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: UserRole.admin, children: "Admin — Full Access" }),
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: UserRole.user, children: "User — Standard Access" }),
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: UserRole.guest, children: "Guest — View Only" })
-                      ] })
-                    ]
-                  }
-                )
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                Button,
-                {
-                  onClick: handleAssignRole,
-                  disabled: assignRole.isPending || !principalInput.trim(),
-                  style: {
-                    backgroundColor: "oklch(var(--primary))",
-                    color: "white"
-                  },
-                  "data-ocid": "admin.submit_button",
-                  children: [
-                    assignRole.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-4 w-4 mr-2 animate-spin" }) : null,
-                    assignRole.isPending ? "Assigning…" : "Assign Role"
-                  ]
-                }
-              )
-            ] })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        motion.div,
-        {
-          initial: { opacity: 0, y: 12 },
-          animate: { opacity: 1, y: 0 },
-          transition: { delay: 0.1, duration: 0.35 },
-          className: "rounded-xl border shadow-card overflow-hidden",
-          style: {
-            backgroundColor: "oklch(var(--card))",
-            borderColor: "oklch(var(--border))"
-          },
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "div",
-              {
-                className: "px-5 py-4 border-b flex items-center gap-2",
-                style: { borderColor: "oklch(var(--border))" },
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Users,
-                    {
-                      className: "h-4 w-4",
-                      style: { color: "oklch(var(--muted-foreground))" }
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-semibold text-base text-foreground", children: "Assets by Assignee" })
-                ]
-              }
-            ),
-            assetsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-5 space-y-3", "data-ocid": "admin.loading_state", children: ["u1", "u2", "u3"].map((k) => /* @__PURE__ */ jsxRuntimeExports.jsx(Skeleton, { className: "h-14 w-full" }, k)) }) : assigneeGroups.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "div",
-              {
-                className: "flex flex-col items-center justify-center py-16 gap-2",
-                "data-ocid": "admin.empty_state",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Users,
-                    {
-                      className: "h-8 w-8",
-                      style: { color: "oklch(var(--muted-foreground))" }
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "p",
-                    {
-                      className: "text-sm",
-                      style: { color: "oklch(var(--muted-foreground))" },
-                      children: "No assets are currently assigned"
-                    }
-                  )
-                ]
-              }
-            ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "ul",
-              {
-                className: "divide-y",
-                style: { borderColor: "oklch(var(--border))" },
-                children: assigneeGroups.map(([user, userAssets], i) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                  "li",
-                  {
-                    className: "px-5 py-3 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors",
-                    "data-ocid": `admin.item.${i + 1}`,
-                    children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
-                        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground truncate", children: user }),
-                        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: userAssets.map((a) => a.name).join(", ") })
-                      ] }),
-                      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                        "span",
-                        {
-                          className: "flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full",
-                          style: {
-                            backgroundColor: "oklch(var(--status-assigned-bg))",
-                            color: "oklch(var(--status-assigned-text))"
-                          },
-                          children: [
-                            userAssets.length,
-                            " asset",
-                            userAssets.length !== 1 ? "s" : ""
-                          ]
-                        }
-                      )
-                    ]
-                  },
-                  user
-                ))
-              }
-            )
-          ]
         }
       )
     ] }),
@@ -43257,6 +43042,7 @@ const categoryIcons = {
   Monitor: /* @__PURE__ */ jsxRuntimeExports.jsx(Monitor, { className: "h-5 w-5" }),
   Server: /* @__PURE__ */ jsxRuntimeExports.jsx(Server, { className: "h-5 w-5" }),
   Printer: /* @__PURE__ */ jsxRuntimeExports.jsx(Printer, { className: "h-5 w-5" }),
+  Peripheral: /* @__PURE__ */ jsxRuntimeExports.jsx(Package, { className: "h-5 w-5" }),
   Other: /* @__PURE__ */ jsxRuntimeExports.jsx(HardDrive, { className: "h-5 w-5" })
 };
 const categorySmallIcons = {
@@ -43265,6 +43051,7 @@ const categorySmallIcons = {
   Monitor: /* @__PURE__ */ jsxRuntimeExports.jsx(Monitor, { className: "h-4 w-4" }),
   Server: /* @__PURE__ */ jsxRuntimeExports.jsx(Server, { className: "h-4 w-4" }),
   Printer: /* @__PURE__ */ jsxRuntimeExports.jsx(Printer, { className: "h-4 w-4" }),
+  Peripheral: /* @__PURE__ */ jsxRuntimeExports.jsx(Package, { className: "h-4 w-4" }),
   Other: /* @__PURE__ */ jsxRuntimeExports.jsx(HardDrive, { className: "h-4 w-4" })
 };
 const AGE_BUCKETS_TEMPLATE = [
@@ -46399,6 +46186,7 @@ const CATEGORIES = [
   "Printer",
   "Server",
   "Network",
+  "Peripheral",
   "Other"
 ];
 const STATUSES = [
@@ -47417,6 +47205,7 @@ const CATEGORY_MAP = {
   monitor: "Monitor",
   printer: "Printer",
   server: "Server",
+  peripheral: "Peripheral",
   other: "Other"
 };
 const STATUS_MAP = {
@@ -47882,6 +47671,7 @@ function InventoryPage({
                 "Printer",
                 "Server",
                 "Network",
+                "Peripheral",
                 "Other"
               ].map((c) => /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: c, children: c }, c))
             ] })

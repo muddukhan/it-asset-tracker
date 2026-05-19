@@ -45,6 +45,7 @@ const CATEGORIES = [
   "Printer",
   "Server",
   "Network",
+  "Peripheral",
   "Other",
 ];
 const STATUSES = [

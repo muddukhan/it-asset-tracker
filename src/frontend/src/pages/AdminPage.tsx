@@ -706,7 +706,7 @@ export function AdminPage({
     useIsCallerAdmin();
   const isLocalAdmin = localSession?.accessLevel === "admin";
   const isAdmin = isLocalAdmin || isAdminFromChain;
-  const { data: assets, isLoading: assetsLoading } = useGetAllAssets();
+  const { data: assets } = useGetAllAssets();
   const { data: usersWithRoles, isLoading: usersLoading } =
     useGetAllUsersWithRoles(isAdmin ?? false);
   const { data: localUsers, isLoading: localUsersLoading } =
@@ -737,7 +737,7 @@ export function AdminPage({
     );
   }
 
-  const handleAssignRole = async () => {
+  const _handleAssignRole = async () => {
     const trimmed = principalInput.trim();
     if (!trimmed) {
       toast.error("Please enter a principal ID");
@@ -770,7 +770,7 @@ export function AdminPage({
     }
   };
 
-  const handleFillMyPrincipal = () => {
+  const _handleFillMyPrincipal = () => {
     if (!myPrincipal) {
       toast.error("Please sign in first");
       return;
@@ -921,183 +921,6 @@ export function AdminPage({
         >
           User role management and asset allocation overview
         </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Role assignment form */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="rounded-xl border shadow-card p-6"
-          style={{
-            backgroundColor: "oklch(var(--card))",
-            borderColor: "oklch(var(--border))",
-          }}
-        >
-          <h2 className="font-semibold text-base text-foreground mb-1">
-            Assign User Role
-          </h2>
-          <p
-            className="text-xs mb-4"
-            style={{ color: "oklch(var(--muted-foreground))" }}
-          >
-            Grant or change a user&apos;s access level by their principal ID
-          </p>
-
-          {/* Fill My Principal quick button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleFillMyPrincipal}
-            disabled={!myPrincipal}
-            className="w-full mb-5 border-dashed"
-            style={{
-              borderColor: "oklch(var(--accent) / 0.5)",
-              color: "oklch(var(--accent))",
-            }}
-            data-ocid="admin.secondary_button"
-          >
-            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-            Fill My Principal
-          </Button>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="principal-input">Principal ID</Label>
-              <Input
-                id="principal-input"
-                placeholder="e.g. aaaaa-aa"
-                value={principalInput}
-                onChange={(e) => setPrincipalInput(e.target.value)}
-                data-ocid="admin.input"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Tip: Click &quot;Fill My Principal&quot; above to auto-fill your
-                own principal ID.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="role-select">Role</Label>
-              <Select
-                value={selectedRole}
-                onValueChange={(v) => setSelectedRole(v as UserRole)}
-              >
-                <SelectTrigger id="role-select" data-ocid="admin.select">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UserRole.admin}>
-                    Admin — Full Access
-                  </SelectItem>
-                  <SelectItem value={UserRole.user}>
-                    User — Standard Access
-                  </SelectItem>
-                  <SelectItem value={UserRole.guest}>
-                    Guest — View Only
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              onClick={handleAssignRole}
-              disabled={assignRole.isPending || !principalInput.trim()}
-              style={{
-                backgroundColor: "oklch(var(--primary))",
-                color: "white",
-              }}
-              data-ocid="admin.submit_button"
-            >
-              {assignRole.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              {assignRole.isPending ? "Assigning…" : "Assign Role"}
-            </Button>
-          </div>
-        </motion.div>
-
-        {/* Assets by assignee */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-          className="rounded-xl border shadow-card overflow-hidden"
-          style={{
-            backgroundColor: "oklch(var(--card))",
-            borderColor: "oklch(var(--border))",
-          }}
-        >
-          <div
-            className="px-5 py-4 border-b flex items-center gap-2"
-            style={{ borderColor: "oklch(var(--border))" }}
-          >
-            <Users
-              className="h-4 w-4"
-              style={{ color: "oklch(var(--muted-foreground))" }}
-            />
-            <h2 className="font-semibold text-base text-foreground">
-              Assets by Assignee
-            </h2>
-          </div>
-
-          {assetsLoading ? (
-            <div className="p-5 space-y-3" data-ocid="admin.loading_state">
-              {["u1", "u2", "u3"].map((k) => (
-                <Skeleton key={k} className="h-14 w-full" />
-              ))}
-            </div>
-          ) : assigneeGroups.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center py-16 gap-2"
-              data-ocid="admin.empty_state"
-            >
-              <Users
-                className="h-8 w-8"
-                style={{ color: "oklch(var(--muted-foreground))" }}
-              />
-              <p
-                className="text-sm"
-                style={{ color: "oklch(var(--muted-foreground))" }}
-              >
-                No assets are currently assigned
-              </p>
-            </div>
-          ) : (
-            <ul
-              className="divide-y"
-              style={{ borderColor: "oklch(var(--border))" }}
-            >
-              {assigneeGroups.map(([user, userAssets], i) => (
-                <li
-                  key={user}
-                  className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
-                  data-ocid={`admin.item.${i + 1}`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {user}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {userAssets.map((a) => a.name).join(", ")}
-                    </p>
-                  </div>
-                  <span
-                    className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full"
-                    style={{
-                      backgroundColor: "oklch(var(--status-assigned-bg))",
-                      color: "oklch(var(--status-assigned-text))",
-                    }}
-                  >
-                    {userAssets.length} asset
-                    {userAssets.length !== 1 ? "s" : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </motion.div>
       </div>
 
       {/* Users & Roles section (Internet Identity users) */}
